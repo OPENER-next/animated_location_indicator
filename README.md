@@ -2,6 +2,8 @@
 
 A simple yet customizable plugin for [Flutter Map](https://github.com/fleaflet/flutter_map) to display the current user location, accuracy and orientation along with automatically animating changes of these properties.
 
+https://user-images.githubusercontent.com/13716661/137280525-d6320c43-e82a-4431-b293-640527ef9df0.mp4
+
 ## Features
 
 - Location, accuracy and orientation indicator can be replaced by custom widgets
