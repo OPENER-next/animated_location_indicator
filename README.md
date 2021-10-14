@@ -15,7 +15,7 @@ This plugin requires the location permission. Since the plugin uses [geolocator]
 ### Android
 
 In order to use this plugin on Android, you have to add the following permission in the `AndroidManifest.xml` file:
-```
+```xml
 <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 ```
 
@@ -25,7 +25,7 @@ Make sure that the `compileSdkVersion` version in `android/app/build.gradle` is 
 
 In order to use this plugin on iOS, you have to add the following permission in the `Info.plist` file:
 
-```
+```xml
 <key>NSLocationWhenInUseUsageDescription</key>
 <string>This app needs access to location when open.</string>
 ```
@@ -34,7 +34,7 @@ In order to use this plugin on iOS, you have to add the following permission in 
 
 Add `animated_location_indicator` to your pubspec:
 
-```
+```yml
 dependencies:
   animated_location_indicator:
     git:
@@ -43,7 +43,7 @@ dependencies:
 
 Import the package.
 
-```
+```dart
 import 'package:animated_location_indicator/animated_location_indicator.dart';
 ```
 
@@ -51,7 +51,7 @@ import 'package:animated_location_indicator/animated_location_indicator.dart';
 
 Add the the `AnimatedLocationLayerWidget` to the `children` of the `FlutterMap` widget.
 
-```
+```dart
 FlutterMap(
   children: [
     TileLayerWidget(
@@ -71,7 +71,7 @@ FlutterMap(
 
 Adjust the appearance of the default indicators.
 
-```
+```dart
 AnimatedLocationLayerWidget(
   options: AnimatedLocationOptions(
     accuracyIndicator: const AccuracyIndicator(
@@ -94,7 +94,7 @@ AnimatedLocationLayerWidget(
 
 Use custom indicator widgets.
 
-```
+```dart
 AnimatedLocationLayerWidget(
   options: AnimatedLocationOptions(
     accuracyIndicator: MyCustomWidget(),
