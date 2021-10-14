@@ -1,0 +1,1 @@
+# Example App for the Animated Location Indicator plugin
