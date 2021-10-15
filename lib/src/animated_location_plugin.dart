@@ -6,6 +6,7 @@ import '/src/animated_location_layer.dart';
 
 class AnimatedLocationPlugin implements MapPlugin {
   @override
+  // ignore: prefer_void_to_null
   Widget createLayer(LayerOptions options, MapState mapState, Stream<Null> stream) {
     if (options is AnimatedLocationOptions) {
       return AnimatedLocationLayer(options, mapState, stream);

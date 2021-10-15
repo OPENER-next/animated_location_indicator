@@ -73,6 +73,7 @@ class AnimatedLocationOptions extends LayerOptions {
     this.locationAnimationCurve = Curves.linear,
     this.orientationAnimationCurve = Curves.ease,
     this.accuracyAnimationCurve = Curves.ease,
+    // ignore: prefer_void_to_null
     Stream<Null>? rebuild,
   }) : assert(orientationIndicatorRadius > 0),
        assert(locationIndicatorRadius > 0),

@@ -30,6 +30,7 @@ class AnimatedLocationLayerWidget extends StatelessWidget {
 class AnimatedLocationLayer extends StatefulWidget {
   final AnimatedLocationOptions options;
   final MapState map;
+  // ignore: prefer_void_to_null
   final Stream<Null>? stream;
 
   AnimatedLocationLayer(this.options, this.map, this.stream)

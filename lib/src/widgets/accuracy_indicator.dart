@@ -51,7 +51,7 @@ class CirclePainter extends CustomPainter {
         offset,
         radius,
         Paint()
-          ..color = this.color
+          ..color = color
           ..style = PaintingStyle.fill
       );
     }
