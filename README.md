@@ -14,6 +14,8 @@ https://user-images.githubusercontent.com/13716661/137280525-d6320c43-e82a-4431-
 
 This plugin requires the location permission. Since the plugin uses [geolocator](https://pub.dev/packages/geolocator) you can find more information there.
 
+**Note:**  If the location permission isn't granted on widget build the location indicator will be hidden/disabled. Once the permission is granted you have to rebuild the location indicator to activate it.
+
 ### Android
 
 In order to use this plugin on Android, you have to add the following permission in the `AndroidManifest.xml` file:

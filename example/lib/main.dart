@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:animated_location_indicator/animated_location_indicator.dart';
@@ -20,6 +21,8 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final mapController = MapController();
 
+  final hasLocation = ValueNotifier(false);
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +30,7 @@ class _MyAppState extends State<MyApp> {
     mapController.onReady.then((value) async {
       final position = await acquireUserLocation();
       if (position != null) {
+        hasLocation.value = true;
         mapController.move(LatLng(position.latitude, position.longitude), 16);
       }
     });
@@ -54,8 +58,14 @@ class _MyAppState extends State<MyApp> {
                 tileProvider: NetworkTileProvider(),
               ),
             ),
-            AnimatedLocationLayerWidget(
-              options: AnimatedLocationOptions(),
+            ValueListenableBuilder(
+              valueListenable: hasLocation,
+              // important: rebuild location layer when permissions are granted
+              builder: (context, hasLocation, child) {
+                return AnimatedLocationLayerWidget(
+                  options: AnimatedLocationOptions(),
+                );
+              }
             )
           ],
         )

@@ -52,9 +52,9 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
   double scale = 1;
 
-  late StreamSubscription<void>? mapStreamSub;
-  late StreamSubscription<Position> locationStreamSub;
-  late StreamSubscription<AbsoluteOrientationEvent> orientationStreamSub;
+  StreamSubscription<void>? mapStreamSub;
+  StreamSubscription<Position>? locationStreamSub;
+  StreamSubscription<AbsoluteOrientationEvent>? orientationStreamSub;
 
   late final positionAnimationController = AnimationController(
     vsync: this,
@@ -77,7 +77,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       setState(() { /* rebuild on animation */ });
     });
 
-    _setup();
+    _setupStreams();
   }
 
 
@@ -88,8 +88,8 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     positionAnimationController.duration = widget.options.locationAnimationDuration;
     positionAnimation.curve = widget.options.locationAnimationCurve;
 
-    _cleanup();
-    _setup();
+    _cleanupStreams();
+    _setupStreams();
   }
 
 
@@ -139,13 +139,18 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
-  void _setup() {
+  void _setupStreams() async {
     // map event stream
     mapStreamSub = widget.stream?.listen(_handleMapEvent);
 
-    locationStreamSub = Geolocator.getPositionStream(
-      intervalDuration: widget.options.locationUpdateInterval
-    ).listen(_handlePositionEvent);
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+      locationStreamSub = Geolocator.getPositionStream(
+        locationSettings: AndroidSettings(
+          intervalDuration: widget.options.locationUpdateInterval
+        )
+      ).listen(_handlePositionEvent, onError: (_) {});
+    }
 
     if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android) {
       motionSensors.absoluteOrientationUpdateInterval = widget.options.orientationUpdateInterval.inMicroseconds;
@@ -157,12 +162,13 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
-  void _cleanup() {
+  void _cleanupStreams() {
     mapStreamSub?.cancel();
-    locationStreamSub.cancel();
-    if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android) {
-      orientationStreamSub.cancel();
-    }
+    locationStreamSub?.cancel();
+    orientationStreamSub?.cancel();
+    mapStreamSub = null;
+    locationStreamSub = null;
+    orientationStreamSub = null;
   }
 
 
@@ -252,7 +258,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     super.dispose();
     positionAnimationController.dispose();
     positionAnimation.dispose();
-    _cleanup();
+    _cleanupStreams();
   }
 }
 
