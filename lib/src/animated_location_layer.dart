@@ -73,10 +73,6 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   void initState() {
     super.initState();
 
-    positionAnimationController.addListener(() {
-      setState(() { /* rebuild on animation */ });
-    });
-
     _setupStreams();
   }
 
@@ -95,44 +91,50 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
   @override
   Widget build(BuildContext context) {
-    if (positionTween == null || _isHidden()) {
-      return const SizedBox.shrink();
-    }
-
-    final relativePixelPosition =
-      widget.map.project(positionTween!.evaluate(positionAnimation))
-      - widget.map.getPixelOrigin();
-
-    return Transform.translate(
-      offset: Offset(
-        relativePixelPosition.x.toDouble(),
-        relativePixelPosition.y.toDouble()
-      ),
-      child: FractionalTranslation(
-        // set location indicator origin to center
-        translation: const Offset(-0.5, -0.5),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            if ((position?.accuracy ?? 0) > 0) AccuracyIndicatorWrapper(
-              radius: position!.accuracy,
-              scale: scale,
-              child: widget.options.accuracyIndicator,
-              duration: widget.options.accuracyAnimationDuration,
-              curve: widget.options.accuracyAnimationCurve
-            ),
-            if (orientation != null) OrientationIndicatorWrapper(
-              orientation: orientation!,
-              radius: widget.options.orientationIndicatorRadius,
-              child: widget.options.orientationIndicator,
-              duration: widget.options.orientationAnimationDuration,
-              curve: widget.options.orientationAnimationCurve
-            ),
-            LocationIndicatorWrapper(
-              radius: widget.options.locationIndicatorRadius,
-              child: widget.options.locationIndicator,
-            )
-          ],
+    return FractionalTranslation(
+      // set location indicator origin to center
+      translation: const Offset(-0.5, -0.5),
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: positionAnimation,
+          builder: (context, child) {
+            if (positionTween == null || _isHidden()) {
+              return const SizedBox.shrink();
+            }
+            final relativePixelPosition =
+              widget.map.project(positionTween!.evaluate(positionAnimation)) - widget.map.getPixelOrigin();
+            return Transform.translate(
+              filterQuality: FilterQuality.none,
+              offset: Offset(
+                relativePixelPosition.x.toDouble(),
+                relativePixelPosition.y.toDouble()
+              ),
+              child: child,
+            );
+          },
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if ((position?.accuracy ?? 0) > 0) AccuracyIndicatorWrapper(
+                radius: position!.accuracy,
+                scale: scale,
+                child: widget.options.accuracyIndicator,
+                duration: widget.options.accuracyAnimationDuration,
+                curve: widget.options.accuracyAnimationCurve
+              ),
+              if (orientation != null) OrientationIndicatorWrapper(
+                orientation: orientation!,
+                radius: widget.options.orientationIndicatorRadius,
+                child: widget.options.orientationIndicator,
+                duration: widget.options.orientationAnimationDuration,
+                curve: widget.options.orientationAnimationCurve
+              ),
+              LocationIndicatorWrapper(
+                radius: widget.options.locationIndicatorRadius,
+                child: widget.options.locationIndicator,
+              )
+            ],
+          )
         )
       )
     );
@@ -183,10 +185,6 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       positionTween!
       ..begin = positionTween!.evaluate(positionAnimation)
       ..end = location;
-
-      positionAnimationController
-      ..value = 0.0
-      ..forward();
     }
   }
 
@@ -224,26 +222,37 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
 
   void _handleMapEvent(void event) {
-    setState(() {
-      _updateScale(position);
-    });
+    _updateScale(position);
+
+    if (!_isHidden()) {
+      setState(() { });
+    }
   }
 
 
   void _handlePositionEvent(Position event) {
-    setState(() {
-      position = event;
-      _updateScale(position);
-      _updatePositionTween(position!);
-    });
+    position = event;
+
+    _updateScale(position);
+    _updatePositionTween(position!);
+
+    if (!_isHidden()) {
+      positionAnimationController
+      ..value = 0.0
+      ..forward();
+
+      setState(() { });
+    }
   }
 
 
   void _handleAbsoluteOrientationEvent(AbsoluteOrientationEvent event) {
-    setState(() {
-      // convert from [-pi, pi] to [0,2pi]
-      orientation = (piDoubled - event.yaw) % piDoubled;
-    });
+    // convert from [-pi, pi] to [0,2pi]
+    orientation = (piDoubled - event.yaw) % piDoubled;
+
+    if (!_isHidden()) {
+      setState(() { });
+    }
   }
 
 
