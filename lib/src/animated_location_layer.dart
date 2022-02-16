@@ -145,13 +145,16 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     // map event stream
     mapStreamSub = widget.stream?.listen(_handleMapEvent);
 
-    final permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
-      locationStreamSub = Geolocator.getPositionStream(
-        locationSettings: AndroidSettings(
-          intervalDuration: widget.options.locationUpdateInterval
-        )
-      ).listen(_handlePositionEvent, onError: (_) {});
+    final locationServiceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (locationServiceEnabled) {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+        locationStreamSub = Geolocator.getPositionStream(
+          locationSettings: AndroidSettings(
+            intervalDuration: widget.options.locationUpdateInterval
+          )
+        ).listen(_handlePositionEvent, onError: (_) {});
+      }
     }
 
     if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android) {
