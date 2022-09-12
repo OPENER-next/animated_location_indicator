@@ -18,23 +18,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final mapController = MapController();
-
-  final hasLocation = ValueNotifier(false);
-
-  @override
-  void initState() {
-    super.initState();
-
-    mapController.onReady.then((value) async {
-      final position = await acquireUserLocation();
-      if (position != null) {
-        hasLocation.value = true;
-        mapController.move(LatLng(position.latitude, position.longitude), 16);
-      }
-    });
-  }
-
+  final _mapController = MapController();
 
   @override
   Widget build(BuildContext context) {
@@ -45,31 +29,36 @@ class _MyAppState extends State<MyApp> {
           title: const Text(MyApp.title),
         ),
         body: FlutterMap(
-          mapController: mapController,
+          mapController: _mapController,
           options: MapOptions(
             enableMultiFingerGestureRace: true,
+            onMapReady: () async {
+              final position = await acquireUserLocation();
+              if (position != null) {
+                // IMPORTANT: rebuild location layer when permissions are granted
+                setState(() {
+                  _mapController.move(LatLng(position.latitude, position.longitude), 16);
+                });
+              }
+            },
           ),
           children: [
-            TileLayerWidget(
-              options: TileLayerOptions(
-                overrideTilesWhenUrlChanges: true,
-                urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                tileProvider: NetworkTileProvider(),
-              ),
+            TileLayer(
+              overrideTilesWhenUrlChanges: true,
+              urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+              tileProvider: NetworkTileProvider(),
             ),
-            ValueListenableBuilder(
-              valueListenable: hasLocation,
-              // important: rebuild location layer when permissions are granted
-              builder: (context, hasLocation, child) {
-                return AnimatedLocationLayerWidget(
-                  options: AnimatedLocationOptions(),
-                );
-              }
-            )
+            const AnimatedLocationLayer(),
           ],
         )
       )
     );
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
   }
 }
 

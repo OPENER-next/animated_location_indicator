@@ -8,33 +8,85 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:motion_sensors/motion_sensors.dart';
 
-import '/src/animated_location_options.dart';
 import '/src/widgets/accuracy_indicator_wrapper.dart';
 import '/src/widgets/location_indicator_wrapper.dart';
 import '/src/widgets/orientation_indicator_wrapper.dart';
-
-
-class AnimatedLocationLayerWidget extends StatelessWidget {
-  final AnimatedLocationOptions options;
-
-  const AnimatedLocationLayerWidget({Key? key, required this.options}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final mapState = MapState.maybeOf(context)!;
-    return AnimatedLocationLayer(options, mapState, mapState.onMoved);
-  }
-}
+import '/src/widgets/accuracy_indicator.dart';
+import '/src/widgets/location_indicator.dart';
+import '/src/widgets/orientation_indicator.dart';
 
 
 class AnimatedLocationLayer extends StatefulWidget {
-  final AnimatedLocationOptions options;
-  final MapState map;
-  // ignore: prefer_void_to_null
-  final Stream<void>? stream;
+  /// The time interval in which new location data should be fetched.
 
-  AnimatedLocationLayer(this.options, this.map, this.stream)
-      : super(key: options.key);
+  final Duration locationUpdateInterval;
+
+  /// The time interval in which new sensor data should be fetched.
+
+  final Duration orientationUpdateInterval;
+
+  /// The radius in pixel of the location indicator.
+
+  final double locationIndicatorRadius;
+
+  /// The radius in pixel of the orientation indicator.
+
+  final double orientationIndicatorRadius;
+
+  /// A custom location indicator widget that replaces the default.
+
+  final Widget locationIndicator;
+
+  /// A custom orientation indicator widget that replaces the default.
+
+  final Widget orientationIndicator;
+
+  /// A custom accuracy indicator widget that replaces the default.
+
+  final Widget accuracyIndicator;
+
+  /// The duration of the location change transition.
+
+  final Duration locationAnimationDuration;
+
+  /// The curve used for the location change transition.
+
+  final Curve locationAnimationCurve;
+
+  /// The duration of the orientation change transition.
+
+  final Duration orientationAnimationDuration;
+
+  /// The curve used for the orientation change transition.
+
+  final Curve orientationAnimationCurve;
+
+  /// The duration of the accuracy change transition.
+
+  final Duration accuracyAnimationDuration;
+
+  /// The curve used for the accuracy change transition.
+
+  final Curve accuracyAnimationCurve;
+
+  const AnimatedLocationLayer({
+    Key? key,
+    this.locationUpdateInterval = const Duration(milliseconds: 1000),
+    this.orientationUpdateInterval = const Duration(milliseconds: 500),
+    this.locationIndicatorRadius = 10,
+    this.orientationIndicatorRadius = 40,
+    this.locationIndicator = const LocationIndicator(),
+    this.accuracyIndicator = const AccuracyIndicator(),
+    this.orientationIndicator = const OrientationIndicator(),
+    this.locationAnimationDuration = const Duration(milliseconds: 1500),
+    this.accuracyAnimationDuration = const Duration(milliseconds: 600),
+    this.orientationAnimationDuration = const Duration(milliseconds: 600),
+    this.locationAnimationCurve = Curves.linear,
+    this.orientationAnimationCurve = Curves.ease,
+    this.accuracyAnimationCurve = Curves.ease,
+  }) : assert(orientationIndicatorRadius > 0),
+       assert(locationIndicatorRadius > 0),
+       super(key: key);
 
   @override
   State<AnimatedLocationLayer> createState() => _AnimatedLocationLayerState();
@@ -42,32 +94,33 @@ class AnimatedLocationLayer extends StatefulWidget {
 
 
 class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with SingleTickerProviderStateMixin {
-  static const piDoubled = 2 * pi;
+  static const _piDoubled = 2 * pi;
 
-  static const earthCircumference = piDoubled * earthRadius;
+  static const _earthCircumference = _piDoubled * earthRadius;
 
-  Position? position;
+  Position? _position;
 
-  double? orientation;
+  double? _orientation;
 
-  double scale = 1;
+  double _scale = 1;
 
-  StreamSubscription<void>? mapStreamSub;
-  StreamSubscription<Position>? locationStreamSub;
-  StreamSubscription<AbsoluteOrientationEvent>? orientationStreamSub;
+  late FlutterMapState _map;
 
-  late final positionAnimationController = AnimationController(
+  StreamSubscription<Position>? _locationStreamSub;
+  StreamSubscription<AbsoluteOrientationEvent>? _orientationStreamSub;
+
+  late final _positionAnimationController = AnimationController(
     vsync: this,
-    duration: widget.options.locationAnimationDuration
+    duration: widget.locationAnimationDuration
   );
 
-  late final positionAnimation = CurvedAnimation(
-    parent: positionAnimationController,
-    curve: widget.options.locationAnimationCurve
+  late final _positionAnimation = CurvedAnimation(
+    parent: _positionAnimationController,
+    curve: widget.locationAnimationCurve
   );
 
   // animate over lat long because pixels are affected by zoom due to projection
-  LatLngTween? positionTween;
+  LatLngTween? _positionTween;
 
   @override
   void initState() {
@@ -76,13 +129,19 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     _setupStreams();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    _map = FlutterMapState.maybeOf(context)!;
+  }
 
   @override
   void didUpdateWidget(covariant AnimatedLocationLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    positionAnimationController.duration = widget.options.locationAnimationDuration;
-    positionAnimation.curve = widget.options.locationAnimationCurve;
+    _positionAnimationController.duration = widget.locationAnimationDuration;
+    _positionAnimation.curve = widget.locationAnimationCurve;
 
     _cleanupStreams();
     _setupStreams();
@@ -96,18 +155,17 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       translation: const Offset(-0.5, -0.5),
       child: RepaintBoundary(
         child: AnimatedBuilder(
-          animation: positionAnimation,
+          animation: _positionAnimation,
           builder: (context, child) {
-            if (positionTween == null || _isHidden()) {
+            if (_positionTween == null || _isHidden()) {
               return const SizedBox.shrink();
             }
-            final relativePixelPosition =
-              widget.map.project(positionTween!.evaluate(positionAnimation)) - widget.map.getPixelOrigin();
+            final relativePixelPosition = _map.project(_positionTween!.evaluate(_positionAnimation)) - _map.pixelOrigin;
             return Transform.translate(
               filterQuality: FilterQuality.none,
               offset: Offset(
                 relativePixelPosition.x.toDouble(),
-                relativePixelPosition.y.toDouble()
+                relativePixelPosition.y.toDouble(),
               ),
               child: child,
             );
@@ -115,52 +173,49 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
           child: Stack(
             alignment: Alignment.center,
             children: [
-              if ((position?.accuracy ?? 0) > 0) AccuracyIndicatorWrapper(
-                radius: position!.accuracy,
-                scale: scale,
-                child: widget.options.accuracyIndicator,
-                duration: widget.options.accuracyAnimationDuration,
-                curve: widget.options.accuracyAnimationCurve
+              if ((_position?.accuracy ?? 0) > 0) AccuracyIndicatorWrapper(
+                radius: _position!.accuracy,
+                scale: _scale,
+                duration: widget.accuracyAnimationDuration,
+                curve: widget.accuracyAnimationCurve,
+                child: widget.accuracyIndicator,
               ),
-              if (orientation != null) OrientationIndicatorWrapper(
-                orientation: orientation!,
-                radius: widget.options.orientationIndicatorRadius,
-                child: widget.options.orientationIndicator,
-                duration: widget.options.orientationAnimationDuration,
-                curve: widget.options.orientationAnimationCurve
+              if (_orientation != null) OrientationIndicatorWrapper(
+                orientation: _orientation!,
+                radius: widget.orientationIndicatorRadius,
+                duration: widget.orientationAnimationDuration,
+                curve: widget.orientationAnimationCurve,
+                child: widget.orientationIndicator,
               ),
               LocationIndicatorWrapper(
-                radius: widget.options.locationIndicatorRadius,
-                child: widget.options.locationIndicator,
-              )
+                radius: widget.locationIndicatorRadius,
+                child: widget.locationIndicator,
+              ),
             ],
-          )
-        )
-      )
+          ),
+        ),
+      ),
     );
   }
 
 
   void _setupStreams() async {
-    // map event stream
-    mapStreamSub = widget.stream?.listen(_handleMapEvent);
-
     final locationServiceEnabled = await Geolocator.isLocationServiceEnabled();
     if (locationServiceEnabled) {
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
-        locationStreamSub = Geolocator.getPositionStream(
+        _locationStreamSub = Geolocator.getPositionStream(
           locationSettings: AndroidSettings(
-            intervalDuration: widget.options.locationUpdateInterval
+            intervalDuration: widget.locationUpdateInterval
           )
         ).listen(_handlePositionEvent, onError: (_) {});
       }
     }
 
     if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android) {
-      motionSensors.absoluteOrientationUpdateInterval = widget.options.orientationUpdateInterval.inMicroseconds;
+      motionSensors.absoluteOrientationUpdateInterval = widget.orientationUpdateInterval.inMicroseconds;
       // TODO: not working probably due to bug in motion sensor package
-      orientationStreamSub = motionSensors.absoluteOrientation.listen(
+      _orientationStreamSub = motionSensors.absoluteOrientation.listen(
         _handleAbsoluteOrientationEvent
       );
     }
@@ -168,25 +223,23 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
 
   void _cleanupStreams() {
-    mapStreamSub?.cancel();
-    locationStreamSub?.cancel();
-    orientationStreamSub?.cancel();
-    mapStreamSub = null;
-    locationStreamSub = null;
-    orientationStreamSub = null;
+    _locationStreamSub?.cancel();
+    _orientationStreamSub?.cancel();
+    _locationStreamSub = null;
+    _orientationStreamSub = null;
   }
 
 
   void _updatePositionTween(Position position) {
     final location = LatLng(position.latitude, position.longitude);
     // set first position without animating
-    if (positionTween == null) {
-      positionTween = LatLngTween(begin: location, end: location);
+    if (_positionTween == null) {
+      _positionTween = LatLngTween(begin: location, end: location);
     }
     // animate between new and previous position
     else {
-      positionTween!
-      ..begin = positionTween!.evaluate(positionAnimation)
+      _positionTween!
+      ..begin = _positionTween!.evaluate(_positionAnimation)
       ..end = location;
     }
   }
@@ -194,10 +247,10 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
   void _updateScale(Position? position) {
     if (position == null) {
-      scale = 1;
+      _scale = 1;
     }
     else {
-      scale = _calculateMetersPerPixel(position.latitude, widget.map.zoom);
+      _scale = _calculateMetersPerPixel(position.latitude, _map.zoom);
     }
   }
 
@@ -205,42 +258,33 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   // calculates the indicator pixel position based on its size and location
   // returns true if the indicator is outside the viewport or no location is available
   bool _isHidden() {
-    if (position != null && positionTween != null) {
-      final accuracyInPixel = position!.accuracy / scale;
+    if (_position != null && _positionTween != null) {
+      final accuracyInPixel = _position!.accuracy / _scale;
 
       final maxRadius = [
         accuracyInPixel,
-        widget.options.locationIndicatorRadius,
-        widget.options.orientationIndicatorRadius
+        widget.locationIndicatorRadius,
+        widget.orientationIndicatorRadius
       ].reduce(max);
 
-      final positionInPixel = widget.map.project(positionTween!.evaluate(positionAnimation));
+      final positionInPixel = _map.project(_positionTween!.evaluate(_positionAnimation));
       final sw = CustomPoint(positionInPixel.x + maxRadius, positionInPixel.y - maxRadius);
       final ne = CustomPoint(positionInPixel.x - maxRadius, positionInPixel.y + maxRadius);
 
-      return !widget.map.pixelBounds.containsPartialBounds(Bounds(sw, ne));
+      return !_map.pixelBounds.containsPartialBounds(Bounds(sw, ne));
     }
     return true;
   }
 
 
-  void _handleMapEvent(void event) {
-    _updateScale(position);
-
-    if (!_isHidden()) {
-      setState(() { });
-    }
-  }
-
-
   void _handlePositionEvent(Position event) {
-    position = event;
+    _position = event;
 
-    _updateScale(position);
-    _updatePositionTween(position!);
+    _updateScale(_position);
+    _updatePositionTween(_position!);
 
     if (!_isHidden()) {
-      positionAnimationController
+      _positionAnimationController
       ..value = 0.0
       ..forward();
 
@@ -251,7 +295,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
   void _handleAbsoluteOrientationEvent(AbsoluteOrientationEvent event) {
     // convert from [-pi, pi] to [0,2pi]
-    orientation = (piDoubled - event.yaw) % piDoubled;
+    _orientation = (_piDoubled - event.yaw) % _piDoubled;
 
     if (!_isHidden()) {
       setState(() { });
@@ -261,16 +305,16 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
   double _calculateMetersPerPixel(double latitude, double zoomLevel) {
     final latitudeRadians = latitude * (pi/180);
-    return earthCircumference * cos(latitudeRadians) / pow(2, zoomLevel + 8);
+    return _earthCircumference * cos(latitudeRadians) / pow(2, zoomLevel + 8);
   }
 
 
   @override
   void dispose() {
-    super.dispose();
-    positionAnimationController.dispose();
-    positionAnimation.dispose();
+    _positionAnimationController.dispose();
+    _positionAnimation.dispose();
     _cleanupStreams();
+    super.dispose();
   }
 }
 
