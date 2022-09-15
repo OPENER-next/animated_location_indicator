@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 class LocationIndicator extends StatelessWidget {
+  /// The radius in pixel of the location indicator.
+
+  final double radius;
+
   final Color color;
 
   final Color strokeColor;
@@ -8,11 +12,13 @@ class LocationIndicator extends StatelessWidget {
   final double strokeWidth;
 
   const LocationIndicator({
+    this.radius = 10,
     this.color = Colors.blue,
     this.strokeColor = Colors.white,
     this.strokeWidth = 4,
     Key? key,
-  }) : super(key: key);
+  }) : assert(radius > 0),
+       super(key: key);
 
   @override
   Widget build(context) {
@@ -24,8 +30,11 @@ class LocationIndicator extends StatelessWidget {
           width: 4
         ),
         boxShadow: kElevationToShadow[4],
-        shape: BoxShape.circle
-      )
+        shape: BoxShape.circle,
+      ),
+      child: SizedBox.fromSize(
+        size: Size.fromRadius(radius),
+      ),
     );
   }
 }

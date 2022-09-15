@@ -18,9 +18,9 @@ class AccuracyIndicatorWrapper extends ImplicitlyAnimatedWidget {
     required this.radius,
     required this.child,
     this.scale = 1,
-    Key? key,
     Duration duration = const Duration(milliseconds: 300),
     Curve curve = Curves.ease,
+    Key? key,
   }) : super(key: key, duration: duration, curve: curve);
 
    @override
@@ -42,11 +42,16 @@ class _AccuracyIndicatorWrapperState extends AnimatedWidgetBaseState<AccuracyInd
 
   @override
   Widget build(context) {
-    return SizedBox.fromSize(
-      size: Size.fromRadius(
-        (_sizeTween?.evaluate(animation) ?? _sizeTween?.begin ?? 0) / widget.scale
+    // provide unconstrained constraints so the widget can be larger than the stack
+    return OverflowBox(
+      maxWidth: double.infinity,
+      maxHeight: double.infinity,
+      child: SizedBox.fromSize(
+        size: Size.fromRadius(
+          (_sizeTween?.evaluate(animation) ?? _sizeTween?.begin ?? 0) / widget.scale
+        ),
+        child:  widget.child,
       ),
-      child: widget.child
     );
   }
 }

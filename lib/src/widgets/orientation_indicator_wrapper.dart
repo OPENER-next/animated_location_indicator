@@ -10,23 +10,17 @@ class OrientationIndicatorWrapper extends ImplicitlyAnimatedWidget {
 
   final double orientation;
 
-  /// Size as radius in pixel of the orientation widget.
-
-  final double radius;
-
   /// An custom widget that will replace the default indicator.
 
   final Widget child;
 
   const OrientationIndicatorWrapper({
     required this.child,
-    this.radius = 40,
     this.orientation = 0,
     Key? key,
     Duration duration = const Duration(milliseconds: 300),
     Curve curve = Curves.ease,
-  }) : assert(radius > 0),
-       super(key: key, duration: duration, curve: curve);
+  }) : super(key: key, duration: duration, curve: curve);
 
    @override
   _OrientationIndicatorWrapperState createState() => _OrientationIndicatorWrapperState();
@@ -50,10 +44,7 @@ class _OrientationIndicatorWrapperState extends AnimatedWidgetBaseState<Orientat
     return Transform.rotate(
       alignment: Alignment.center,
       angle: _rotationTween?.evaluate(animation) ?? _rotationTween?.begin ?? 0,
-      child: SizedBox.fromSize(
-        size: Size.fromRadius(widget.radius),
-        child: widget.child
-      ),
+      child: widget.child
     );
   }
 }

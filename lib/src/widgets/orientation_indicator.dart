@@ -5,15 +5,21 @@ import 'package:flutter/material.dart';
 class OrientationIndicator extends StatelessWidget {
   final Color color;
 
+  /// The radius in pixel of the orientation indicator.
+
+  final double radius;
+
   /// The value is expected to be in radians.
 
   final double sectorSize;
 
   const OrientationIndicator({
     Key? key,
+    this.radius = 40,
     this.color = Colors.blue,
     this.sectorSize = pi/2,
-  }) : assert(sectorSize > 0),
+  }) : assert(radius > 0),
+       assert(sectorSize > 0),
        super(key: key);
 
 
@@ -21,19 +27,18 @@ class OrientationIndicator extends StatelessWidget {
   Widget build(context) {
     return IgnorePointer(
       child: CustomPaint(
-        painter: OrientationIndicatorPainter(
+        size: Size.fromRadius(radius),
+        painter: _OrientationIndicatorPainter(
           color: color,
           sectorSize: sectorSize
-        )
-      )
+        ),
+      ),
     );
   }
 }
 
 
-
-
-class OrientationIndicatorPainter extends CustomPainter {
+class _OrientationIndicatorPainter extends CustomPainter {
   final Color color;
 
   /// The value is expected to be in radians.
@@ -41,7 +46,7 @@ class OrientationIndicatorPainter extends CustomPainter {
 
   final double sectorSize;
 
-  const OrientationIndicatorPainter({
+  const _OrientationIndicatorPainter({
     this.color = Colors.black,
     this.sectorSize = pi/2
   });
@@ -81,7 +86,7 @@ class OrientationIndicatorPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(OrientationIndicatorPainter oldDelegate) =>
+  bool shouldRepaint(_OrientationIndicatorPainter oldDelegate) =>
     oldDelegate.color != color ||
     oldDelegate.sectorSize != sectorSize;
 }

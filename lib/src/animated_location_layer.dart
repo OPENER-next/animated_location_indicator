@@ -9,7 +9,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:motion_sensors/motion_sensors.dart';
 
 import '/src/widgets/accuracy_indicator_wrapper.dart';
-import '/src/widgets/location_indicator_wrapper.dart';
 import '/src/widgets/orientation_indicator_wrapper.dart';
 import '/src/widgets/accuracy_indicator.dart';
 import '/src/widgets/location_indicator.dart';
@@ -24,14 +23,6 @@ class AnimatedLocationLayer extends StatefulWidget {
   /// The time interval in which new sensor data should be fetched.
 
   final Duration orientationUpdateInterval;
-
-  /// The radius in pixel of the location indicator.
-
-  final double locationIndicatorRadius;
-
-  /// The radius in pixel of the orientation indicator.
-
-  final double orientationIndicatorRadius;
 
   /// A custom location indicator widget that replaces the default.
 
@@ -73,8 +64,6 @@ class AnimatedLocationLayer extends StatefulWidget {
     Key? key,
     this.locationUpdateInterval = const Duration(milliseconds: 1000),
     this.orientationUpdateInterval = const Duration(milliseconds: 500),
-    this.locationIndicatorRadius = 10,
-    this.orientationIndicatorRadius = 40,
     this.locationIndicator = const LocationIndicator(),
     this.accuracyIndicator = const AccuracyIndicator(),
     this.orientationIndicator = const OrientationIndicator(),
@@ -84,9 +73,7 @@ class AnimatedLocationLayer extends StatefulWidget {
     this.locationAnimationCurve = Curves.linear,
     this.orientationAnimationCurve = Curves.ease,
     this.accuracyAnimationCurve = Curves.ease,
-  }) : assert(orientationIndicatorRadius > 0),
-       assert(locationIndicatorRadius > 0),
-       super(key: key);
+  }) : super(key: key);
 
   @override
   State<AnimatedLocationLayer> createState() => _AnimatedLocationLayerState();
@@ -101,8 +88,6 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   Position? _position;
 
   double? _orientation;
-
-  double _scale = 1;
 
   late FlutterMapState _map;
 
@@ -157,7 +142,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
         child: AnimatedBuilder(
           animation: _positionAnimation,
           builder: (context, child) {
-            if (_positionTween == null || _isHidden()) {
+            if (_positionTween == null) {
               return const SizedBox.shrink();
             }
             final relativePixelPosition = _map.project(_positionTween!.evaluate(_positionAnimation)) - _map.pixelOrigin;
@@ -182,15 +167,11 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
               ),
               if (_orientation != null) OrientationIndicatorWrapper(
                 orientation: _orientation!,
-                radius: widget.orientationIndicatorRadius,
                 duration: widget.orientationAnimationDuration,
                 curve: widget.orientationAnimationCurve,
                 child: widget.orientationIndicator,
               ),
-              LocationIndicatorWrapper(
-                radius: widget.locationIndicatorRadius,
-                child: widget.locationIndicator,
-              ),
+              widget.locationIndicator,
             ],
           ),
         ),
@@ -245,61 +226,31 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
-  void _updateScale(Position? position) {
-    if (position == null) {
-      _scale = 1;
-    }
-    else {
-      _scale = _calculateMetersPerPixel(position.latitude, _map.zoom);
-    }
-  }
-
-
-  // calculates the indicator pixel position based on its size and location
-  // returns true if the indicator is outside the viewport or no location is available
-  bool _isHidden() {
-    if (_position != null && _positionTween != null) {
-      final accuracyInPixel = _position!.accuracy / _scale;
-
-      final maxRadius = [
-        accuracyInPixel,
-        widget.locationIndicatorRadius,
-        widget.orientationIndicatorRadius
-      ].reduce(max);
-
-      final positionInPixel = _map.project(_positionTween!.evaluate(_positionAnimation));
-      final sw = CustomPoint(positionInPixel.x + maxRadius, positionInPixel.y - maxRadius);
-      final ne = CustomPoint(positionInPixel.x - maxRadius, positionInPixel.y + maxRadius);
-
-      return !_map.pixelBounds.containsPartialBounds(Bounds(sw, ne));
-    }
-    return true;
+  double get _scale {
+    return _position != null
+      ? _calculateMetersPerPixel(_position!.latitude, _map.zoom)
+      : 1;
   }
 
 
   void _handlePositionEvent(Position event) {
-    _position = event;
+    setState(() {
+      _position = event;
 
-    _updateScale(_position);
-    _updatePositionTween(_position!);
+      _updatePositionTween(_position!);
 
-    if (!_isHidden()) {
       _positionAnimationController
       ..value = 0.0
       ..forward();
-
-      setState(() { });
-    }
+    });
   }
 
 
   void _handleAbsoluteOrientationEvent(AbsoluteOrientationEvent event) {
-    // convert from [-pi, pi] to [0,2pi]
-    _orientation = (_piDoubled - event.yaw) % _piDoubled;
-
-    if (!_isHidden()) {
-      setState(() { });
-    }
+    setState(() {
+      // convert from [-pi, pi] to [0,2pi]
+      _orientation = (_piDoubled - event.yaw) % _piDoubled;
+    });
   }
 
 

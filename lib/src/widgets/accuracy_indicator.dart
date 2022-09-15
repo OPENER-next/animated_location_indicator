@@ -17,7 +17,7 @@ class AccuracyIndicator extends StatelessWidget {
   Widget build(context) {
     return IgnorePointer(
       child: CustomPaint(
-        painter: CirclePainter(
+        painter: _CirclePainter(
           color: color,
           strokeColor: strokeColor,
           strokeWidth: strokeWidth
@@ -28,12 +28,12 @@ class AccuracyIndicator extends StatelessWidget {
 }
 
 
-class CirclePainter extends CustomPainter {
+class _CirclePainter extends CustomPainter {
   final Color color;
   final double strokeWidth;
   final Color strokeColor;
 
-  const CirclePainter({
+  const _CirclePainter({
     this.color = Colors.black,
     this.strokeColor = Colors.transparent,
     this.strokeWidth = 2
@@ -70,7 +70,7 @@ class CirclePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(CirclePainter oldDelegate) =>
+  bool shouldRepaint(_CirclePainter oldDelegate) =>
     oldDelegate.color != color ||
     oldDelegate.strokeColor != strokeColor ||
     oldDelegate.strokeWidth != strokeWidth;
