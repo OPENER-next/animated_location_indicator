@@ -42,16 +42,11 @@ class _AccuracyIndicatorWrapperState extends AnimatedWidgetBaseState<AccuracyInd
 
   @override
   Widget build(context) {
-    // provide unconstrained constraints so the widget can be larger than the stack
-    return OverflowBox(
-      maxWidth: double.infinity,
-      maxHeight: double.infinity,
-      child: SizedBox.fromSize(
-        size: Size.fromRadius(
-          (_sizeTween?.evaluate(animation) ?? _sizeTween?.begin ?? 0) / widget.scale
-        ),
-        child:  widget.child,
+    return SizedBox.fromSize(
+      size: Size.fromRadius(
+        (_sizeTween?.evaluate(animation) ?? _sizeTween?.begin ?? 0) / widget.scale,
       ),
+      child: widget.child,
     );
   }
 }

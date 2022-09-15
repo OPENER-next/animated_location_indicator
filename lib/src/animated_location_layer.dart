@@ -16,6 +16,7 @@ import '/src/widgets/orientation_indicator.dart';
 
 
 class AnimatedLocationLayer extends StatefulWidget {
+
   /// The time interval in which new location data should be fetched.
 
   final Duration locationUpdateInterval;
@@ -23,6 +24,18 @@ class AnimatedLocationLayer extends StatefulWidget {
   /// The time interval in which new sensor data should be fetched.
 
   final Duration orientationUpdateInterval;
+
+  /// The minimal distance difference in meters of the new and the previous position that will be detected as a change.
+
+  final int locationDifferenceThreshold;
+
+  /// The minimal difference in radians of the new and the previous orientation that will be detected as a change.
+
+  final double orientationDifferenceThreshold;
+
+  /// The minimal difference in meters of the new and the previous accuracy that will be detected as a change.
+
+  final double accuracyDifferenceThreshold;
 
   /// A custom location indicator widget that replaces the default.
 
@@ -64,6 +77,9 @@ class AnimatedLocationLayer extends StatefulWidget {
     Key? key,
     this.locationUpdateInterval = const Duration(milliseconds: 1000),
     this.orientationUpdateInterval = const Duration(milliseconds: 500),
+    this.locationDifferenceThreshold = 1,
+    this.orientationDifferenceThreshold = 0.1,
+    this.accuracyDifferenceThreshold = 0.5,
     this.locationIndicator = const LocationIndicator(),
     this.accuracyIndicator = const AccuracyIndicator(),
     this.orientationIndicator = const OrientationIndicator(),
@@ -85,7 +101,9 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
   static const _earthCircumference = _piDoubled * earthRadius;
 
-  Position? _position;
+  LatLng? _location;
+
+  double _accuracy = 0;
 
   double? _orientation;
 
@@ -114,12 +132,6 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     _setupStreams();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    _map = FlutterMapState.maybeOf(context)!;
-  }
 
   @override
   void didUpdateWidget(covariant AnimatedLocationLayer oldWidget) {
@@ -134,48 +146,40 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    _map = FlutterMapState.maybeOf(context)!;
+  }
+
+
+  @override
   Widget build(BuildContext context) {
-    return FractionalTranslation(
-      // set location indicator origin to center
-      translation: const Offset(-0.5, -0.5),
-      child: RepaintBoundary(
-        child: AnimatedBuilder(
-          animation: _positionAnimation,
-          builder: (context, child) {
-            if (_positionTween == null) {
-              return const SizedBox.shrink();
-            }
-            final relativePixelPosition = _map.project(_positionTween!.evaluate(_positionAnimation)) - _map.pixelOrigin;
-            return Transform.translate(
-              filterQuality: FilterQuality.none,
-              offset: Offset(
-                relativePixelPosition.x.toDouble(),
-                relativePixelPosition.y.toDouble(),
-              ),
-              child: child,
-            );
-          },
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              if ((_position?.accuracy ?? 0) > 0) AccuracyIndicatorWrapper(
-                radius: _position!.accuracy,
-                scale: _scale,
-                duration: widget.accuracyAnimationDuration,
-                curve: widget.accuracyAnimationCurve,
-                child: widget.accuracyIndicator,
-              ),
-              if (_orientation != null) OrientationIndicatorWrapper(
-                orientation: _orientation!,
-                duration: widget.orientationAnimationDuration,
-                curve: widget.orientationAnimationCurve,
-                child: widget.orientationIndicator,
-              ),
-              widget.locationIndicator,
-            ],
-          ),
-        ),
+    if (_positionTween == null || !_isVisible) {
+      return const SizedBox.shrink();
+    }
+
+    return Flow(
+      delegate: _FlowPositionDelegate(
+        position: _positionTween!.animate(_positionAnimation),
+        mapState: _map,
       ),
+      children: [
+        if (_accuracy > 0) AccuracyIndicatorWrapper(
+          radius: _accuracy,
+          scale: _scale,
+          duration: widget.accuracyAnimationDuration,
+          curve: widget.accuracyAnimationCurve,
+          child: widget.accuracyIndicator,
+        ),
+        if (_orientation != null) OrientationIndicatorWrapper(
+          orientation: _orientation!,
+          duration: widget.orientationAnimationDuration,
+          curve: widget.orientationAnimationCurve,
+          child: widget.orientationIndicator,
+        ),
+        widget.locationIndicator,
+      ],
     );
   }
 
@@ -187,7 +191,8 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
         _locationStreamSub = Geolocator.getPositionStream(
           locationSettings: AndroidSettings(
-            intervalDuration: widget.locationUpdateInterval
+            intervalDuration: widget.locationUpdateInterval,
+            distanceFilter: widget.locationDifferenceThreshold,
           )
         ).listen(_handlePositionEvent, onError: (_) {});
       }
@@ -211,8 +216,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
-  void _updatePositionTween(Position position) {
-    final location = LatLng(position.latitude, position.longitude);
+  void _updatePositionTween(LatLng location) {
     // set first position without animating
     if (_positionTween == null) {
       _positionTween = LatLngTween(begin: location, end: location);
@@ -226,31 +230,59 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
-  double get _scale {
-    return _position != null
-      ? _calculateMetersPerPixel(_position!.latitude, _map.zoom)
-      : 1;
+  double get _scale => _location != null
+    ? _calculateMetersPerPixel(_location!.latitude, _map.zoom) : 1;
+
+
+  bool get _isVisible {
+    if (_location == null || _positionTween == null) {
+      return false;
+    }
+
+    final accuracyInPixel = _accuracy / _scale;
+
+    final biggestSize = max(accuracyInPixel, 100);
+    final positionInPixel = _map.project(_positionTween!.evaluate(_positionAnimation));
+    final sw = CustomPoint(positionInPixel.x + biggestSize, positionInPixel.y - biggestSize);
+    final ne = CustomPoint(positionInPixel.x - biggestSize, positionInPixel.y + biggestSize);
+
+    return _map.pixelBounds.containsPartialBounds(Bounds(sw, ne));
   }
 
 
   void _handlePositionEvent(Position event) {
-    setState(() {
-      _position = event;
+    _location = LatLng(event.latitude, event.longitude);
+    _updatePositionTween(_location!);
 
-      _updatePositionTween(_position!);
-
+    // don't update animation or rebuild widget when indicator is not visible in order to prevent repaints
+    if (_isVisible) {
       _positionAnimationController
       ..value = 0.0
       ..forward();
-    });
+
+      final newAccuracy = event.accuracy;
+      // check if difference threshold is reached
+      if ((_accuracy - newAccuracy).abs() > widget.accuracyDifferenceThreshold) {
+        setState(() {
+          _accuracy = newAccuracy;
+        });
+      }
+    }
   }
 
 
   void _handleAbsoluteOrientationEvent(AbsoluteOrientationEvent event) {
-    setState(() {
+    // don't rebuild widget when indicator is not visible in order to prevent repaints
+    if (_isVisible) {
       // convert from [-pi, pi] to [0,2pi]
-      _orientation = (_piDoubled - event.yaw) % _piDoubled;
-    });
+      final newOrientation = (_piDoubled - event.yaw) % _piDoubled;
+      // check if difference threshold is reached
+      if (_orientation == null || (_orientation! - newOrientation).abs() > widget.orientationDifferenceThreshold) {
+        setState(() {
+          _orientation = newOrientation;
+        });
+      }
+    }
   }
 
 
@@ -266,6 +298,61 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     _positionAnimation.dispose();
     _cleanupStreams();
     super.dispose();
+  }
+}
+
+
+/// Flow-Delegate to position the indicators.
+
+class _FlowPositionDelegate extends FlowDelegate {
+
+  final Animation<LatLng> position;
+
+  final FlutterMapState mapState;
+
+  _FlowPositionDelegate({
+    required this.position,
+    required this.mapState,
+  }) : super(repaint: position);
+
+
+  @override
+  bool shouldRepaint(_FlowPositionDelegate oldDelegate) {
+    return position != oldDelegate.position ||
+           mapState != oldDelegate.mapState;
+  }
+
+  @override
+  void paintChildren(FlowPaintingContext context) {
+    final absPixelPosition = mapState.project(position.value);
+    final relPixelPosition = absPixelPosition - mapState.pixelOrigin;
+
+    for (var i = 0; i < context.childCount; i++) {
+      final halfChildSize = context.getChildSize(i)! / 2;
+      final sw = CustomPoint(absPixelPosition.x + halfChildSize.width, absPixelPosition.y - halfChildSize.height);
+      final ne = CustomPoint(absPixelPosition.x - halfChildSize.width, absPixelPosition.y + halfChildSize.height);
+      // only render visible widgets
+      if (mapState.pixelBounds.containsPartialBounds(Bounds(sw, ne))) {
+        context.paintChild(i,
+          transform: Matrix4.translationValues(
+            // center all widgets
+            relPixelPosition.x - halfChildSize.width,
+            relPixelPosition.y - halfChildSize.height,
+            0,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  BoxConstraints getConstraintsForChild(int i, BoxConstraints constraints) {
+    // set constraints to infinity in order to allow the children (like the accuracy circle)
+    // to size themselves bigger than the constraints passed from the outside (usually the screen size)
+    return const BoxConstraints(
+      maxHeight: double.infinity,
+      maxWidth: double.infinity,
+    );
   }
 }
 
