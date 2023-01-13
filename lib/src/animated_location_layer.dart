@@ -278,7 +278,8 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     // don't rebuild widget when indicator is not visible in order to prevent repaints
     if (_isVisible) {
       if (defaultTargetPlatform == TargetPlatform.iOS) {
-        newOrientation = event.data.first;
+        // ios provides azimuth in degrees
+        newOrientation = degToRadian(event.data.first);
       }
       else if (defaultTargetPlatform == TargetPlatform.android) {
         final g = event.data;
@@ -291,15 +292,12 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
         // calc azimuth in radians
         final sinA = 2.0 * (w * z + x * y);
         final cosA = 1.0 - 2.0 * (y * y + z * z);
-        newOrientation = atan2(sinA, cosA);
+        final azimuth = atan2(sinA, cosA);
+        // convert from [-pi, pi] to [0,2pi]
+        newOrientation = (_piDoubled - azimuth) % _piDoubled;
       }
-
       print(newOrientation);
 
-      // convert from [-pi, pi] to [0,2pi]
-      newOrientation = (_piDoubled - newOrientation) % _piDoubled;
-
-      print(newOrientation);
 
       // check if difference threshold is reached
       if (_orientation == null ||
