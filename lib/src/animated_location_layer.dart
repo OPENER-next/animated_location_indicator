@@ -4,9 +4,9 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/plugin_api.dart';
+import 'package:flutter_sensors/flutter_sensors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:motion_sensors/motion_sensors.dart';
 
 import '/src/widgets/accuracy_indicator_wrapper.dart';
 import '/src/widgets/orientation_indicator_wrapper.dart';
@@ -76,7 +76,7 @@ class AnimatedLocationLayer extends StatefulWidget {
   const AnimatedLocationLayer({
     Key? key,
     this.locationUpdateInterval = const Duration(milliseconds: 1000),
-    this.orientationUpdateInterval = const Duration(milliseconds: 500),
+    this.orientationUpdateInterval = const Duration(milliseconds: 200),
     this.locationDifferenceThreshold = 1,
     this.orientationDifferenceThreshold = 0.1,
     this.accuracyDifferenceThreshold = 0.5,
@@ -110,7 +110,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   late FlutterMapState _map;
 
   StreamSubscription<Position>? _locationStreamSub;
-  StreamSubscription<AbsoluteOrientationEvent>? _orientationStreamSub;
+  StreamSubscription<SensorEvent>? _orientationStreamSub;
 
   late final _positionAnimationController = AnimationController(
     vsync: this,
@@ -198,12 +198,12 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       }
     }
 
-    if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android) {
-      motionSensors.absoluteOrientationUpdateInterval = widget.orientationUpdateInterval.inMicroseconds;
-      // TODO: not working probably due to bug in motion sensor package
-      _orientationStreamSub = motionSensors.absoluteOrientation.listen(
-        _handleAbsoluteOrientationEvent
+    if (await SensorManager().isSensorAvailable(Sensors.ROTATION)) {
+      final stream = await SensorManager().sensorUpdates(
+        sensorId: Sensors.ROTATION,
+        interval: widget.orientationUpdateInterval,
       );
+      _orientationStreamSub = stream.listen(_handleAbsoluteOrientationEvent);
     }
   }
 
@@ -271,13 +271,40 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
-  void _handleAbsoluteOrientationEvent(AbsoluteOrientationEvent event) {
+  void _handleAbsoluteOrientationEvent(SensorEvent event) {
+    double? newOrientation = 0;
+
+    print(event.data);
     // don't rebuild widget when indicator is not visible in order to prevent repaints
     if (_isVisible) {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        newOrientation = event.data.first;
+      }
+      else if (defaultTargetPlatform == TargetPlatform.android) {
+        final g = event.data;
+        final norm = sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2] + g[3] * g[3]);
+        // normalize and set values to commonly known quaternion letter representatives
+        final x = g[0] / norm;
+        final y = g[1] / norm;
+        final z = g[2] / norm;
+        final w = g[3] / norm;
+        // calc azimuth in radians
+        final sinA = 2.0 * (w * z + x * y);
+        final cosA = 1.0 - 2.0 * (y * y + z * z);
+        newOrientation = atan2(sinA, cosA);
+      }
+
+      print(newOrientation);
+
       // convert from [-pi, pi] to [0,2pi]
-      final newOrientation = (_piDoubled - event.yaw) % _piDoubled;
+      newOrientation = (_piDoubled - newOrientation) % _piDoubled;
+
+      print(newOrientation);
+
       // check if difference threshold is reached
-      if (_orientation == null || (_orientation! - newOrientation).abs() > widget.orientationDifferenceThreshold) {
+      if (_orientation == null ||
+        (_orientation! - newOrientation).abs() > widget.orientationDifferenceThreshold
+      ) {
         setState(() {
           _orientation = newOrientation;
         });
