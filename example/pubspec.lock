@@ -82,7 +82,14 @@ packages:
       name: flutter_map
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.0"
+    version: "3.1.0"
+  flutter_sensors:
+    dependency: transitive
+    description:
+      name: flutter_sensors
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.1"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -99,14 +106,14 @@ packages:
       name: geolocator
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "9.0.1"
+    version: "9.0.2"
   geolocator_android:
     dependency: transitive
     description:
       name: geolocator_android
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "4.0.2"
+    version: "4.1.4"
   geolocator_apple:
     dependency: transitive
     description:
@@ -141,7 +148,7 @@ packages:
       name: http
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.13.4"
+    version: "0.13.5"
   http_parser:
     dependency: transitive
     description:
@@ -212,13 +219,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "2.0.0"
-  motion_sensors:
-    dependency: transitive
-    description:
-      name: motion_sensors
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "0.1.0"
   path:
     dependency: transitive
     description:
@@ -344,5 +344,5 @@ packages:
     source: hosted
     version: "2.0.0"
 sdks:
-  dart: ">=2.17.1 <3.0.0"
+  dart: ">=2.18.0 <3.0.0"
   flutter: ">=3.3.0"
