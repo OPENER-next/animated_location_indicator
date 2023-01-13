@@ -274,7 +274,6 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   void _handleAbsoluteOrientationEvent(SensorEvent event) {
     double? newOrientation = 0;
 
-    print(event.data);
     // don't rebuild widget when indicator is not visible in order to prevent repaints
     if (_isVisible) {
       if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -296,8 +295,6 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
         // convert from [-pi, pi] to [0,2pi]
         newOrientation = (_piDoubled - azimuth) % _piDoubled;
       }
-      print(newOrientation);
-
 
       // check if difference threshold is reached
       if (_orientation == null ||
