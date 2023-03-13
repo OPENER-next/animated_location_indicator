@@ -112,15 +112,9 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   StreamSubscription<Position>? _locationStreamSub;
   StreamSubscription<SensorEvent>? _orientationStreamSub;
 
-  late final _positionAnimationController = AnimationController(
-    vsync: this,
-    duration: widget.locationAnimationDuration
-  );
+  late final AnimationController _positionAnimationController;
 
-  late final _positionAnimation = CurvedAnimation(
-    parent: _positionAnimationController,
-    curve: widget.locationAnimationCurve
-  );
+  late final CurvedAnimation _positionAnimation;
 
   // animate over lat long because pixels are affected by zoom due to projection
   LatLngTween? _positionTween;
@@ -129,7 +123,15 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   void initState() {
     super.initState();
 
-    _setupStreams();
+    _positionAnimationController = AnimationController(
+      vsync: this,
+      duration: widget.locationAnimationDuration,
+    );
+
+   _positionAnimation = CurvedAnimation(
+      parent: _positionAnimationController,
+      curve: widget.locationAnimationCurve,
+    );
   }
 
 
