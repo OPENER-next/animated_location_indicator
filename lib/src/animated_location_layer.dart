@@ -128,10 +128,12 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       duration: widget.locationAnimationDuration,
     );
 
-   _positionAnimation = CurvedAnimation(
+    _positionAnimation = CurvedAnimation(
       parent: _positionAnimationController,
       curve: widget.locationAnimationCurve,
     );
+
+    _setupStreams();
   }
 
 
