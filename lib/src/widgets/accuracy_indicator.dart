@@ -7,11 +7,11 @@ class AccuracyIndicator extends StatelessWidget {
   final double strokeWidth;
 
   const AccuracyIndicator({
-    Key? key,
     this.color = const Color(0x332196F3),
     this.strokeColor = Colors.transparent,
     this.strokeWidth = 0,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(context) {

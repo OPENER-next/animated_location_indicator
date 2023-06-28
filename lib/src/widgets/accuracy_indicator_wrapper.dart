@@ -18,10 +18,10 @@ class AccuracyIndicatorWrapper extends ImplicitlyAnimatedWidget {
     required this.radius,
     required this.child,
     this.scale = 1,
-    Duration duration = const Duration(milliseconds: 300),
-    Curve curve = Curves.ease,
-    Key? key,
-  }) : super(key: key, duration: duration, curve: curve);
+    super.duration = const Duration(milliseconds: 300),
+    super.curve = Curves.ease,
+    super.key,
+  });
 
    @override
   _AccuracyIndicatorWrapperState createState() => _AccuracyIndicatorWrapperState();

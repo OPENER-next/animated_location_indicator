@@ -17,10 +17,10 @@ class OrientationIndicatorWrapper extends ImplicitlyAnimatedWidget {
   const OrientationIndicatorWrapper({
     required this.child,
     this.orientation = 0,
-    Key? key,
-    Duration duration = const Duration(milliseconds: 300),
-    Curve curve = Curves.ease,
-  }) : super(key: key, duration: duration, curve: curve);
+    super.duration = const Duration(milliseconds: 300),
+    super.curve = Curves.ease,
+    super.key,
+  });
 
    @override
   _OrientationIndicatorWrapperState createState() => _OrientationIndicatorWrapperState();

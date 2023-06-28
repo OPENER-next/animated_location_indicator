@@ -16,9 +16,8 @@ class LocationIndicator extends StatelessWidget {
     this.color = Colors.blue,
     this.strokeColor = Colors.white,
     this.strokeWidth = 4,
-    Key? key,
-  }) : assert(radius > 0),
-       super(key: key);
+    super.key,
+  }) : assert(radius > 0);
 
   @override
   Widget build(context) {

@@ -74,7 +74,6 @@ class AnimatedLocationLayer extends StatefulWidget {
   final Curve accuracyAnimationCurve;
 
   const AnimatedLocationLayer({
-    Key? key,
     this.locationUpdateInterval = const Duration(milliseconds: 1000),
     this.orientationUpdateInterval = const Duration(milliseconds: 200),
     this.locationDifferenceThreshold = 1,
@@ -89,7 +88,8 @@ class AnimatedLocationLayer extends StatefulWidget {
     this.locationAnimationCurve = Curves.linear,
     this.orientationAnimationCurve = Curves.ease,
     this.accuracyAnimationCurve = Curves.ease,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   State<AnimatedLocationLayer> createState() => _AnimatedLocationLayerState();

@@ -14,14 +14,12 @@ class OrientationIndicator extends StatelessWidget {
   final double sectorSize;
 
   const OrientationIndicator({
-    Key? key,
     this.radius = 40,
     this.color = Colors.blue,
     this.sectorSize = pi/2,
+    super.key,
   }) : assert(radius > 0),
-       assert(sectorSize > 0),
-       super(key: key);
-
+       assert(sectorSize > 0);
 
   @override
   Widget build(context) {
