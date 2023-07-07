@@ -18,6 +18,16 @@ import '/src/widgets/location_indicator.dart';
 import '/src/widgets/orientation_indicator.dart';
 
 
+enum CameraTrackingMode {
+  /// The map camera won't follow the user's location.
+  none,
+  /// The map camera will follow the user's location.
+  location,
+  /// The map camera will follow the user's location and rotate according the user's orientation.
+  locationAndOrientation,
+}
+
+
 class AnimatedLocationLayer extends StatefulWidget {
 
   /// The time interval in which new location data should be fetched.
@@ -75,6 +85,9 @@ class AnimatedLocationLayer extends StatefulWidget {
   /// The curve used for the accuracy change transition.
 
   final Curve accuracyAnimationCurve;
+
+  /// Defines if and how the camera should follow the user.
+  final CameraTrackingMode cameraTrackingMode;
 
   /// Fires on real and interpolated orientation, location and accuracy value changes.
 
@@ -144,7 +157,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       _setupSensorStreams();
     });
 
-
+    _controller.addListener(_updateCamera);
   }
 
   @override
@@ -153,6 +166,9 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     _cleanupSensorStreams();
     _setupSensorStreams();
 
+    if (widget.controller != oldWidget.controller) {
+      (oldWidget.controller ?? _internalController)?.removeListener(_updateCamera);
+    }
   }
 
   @override
@@ -295,6 +311,35 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
+  /// Handles camera position and rotation updates when the AnimatedLocationController changes
+
+  void _updateCamera() async {
+    // if there's a current frame wait for the end of that frame.
+    if (SchedulerBinding.instance.schedulerPhase != SchedulerPhase.idle) {
+      await SchedulerBinding.instance.endOfFrame;
+    }
+    if (!mounted) return;
+
+    if (widget.cameraTrackingMode != CameraTrackingMode.none && _controller.location != null) {
+      final controller = MapController.of(context);
+      if (widget.cameraTrackingMode == CameraTrackingMode.locationAndOrientation && _controller.orientation != null) {
+        // (counter) rotate map so the map faces always the direction the user is facing
+        controller.moveAndRotate(
+          _controller.location!,
+          _mapCamera.zoom,
+          _controller.orientation! * (-180/pi),
+          id: "AnimatedLocationLayerCameraTracking",
+        );
+      }
+      else {
+        controller.move(
+          _controller.location!,
+          _mapCamera.zoom,
+          id: "AnimatedLocationLayerCameraTracking",
+        );
+      }
+    }
+  }
 
 
   double _calculateMetersPerPixel(double latitude, double zoomLevel) {
@@ -307,6 +352,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   void dispose() {
     _cleanupSensorStreams();
     _serviceStatusStreamSub.cancel();
+    _controller.removeListener(_updateCamera);
     _internalController?.dispose();
     super.dispose();
   }
