@@ -3,12 +3,15 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_map/plugin_api.dart';
 import 'package:flutter_sensors/flutter_sensors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '/src/animated_location_controller.dart';
 import '/src/widgets/accuracy_indicator_wrapper.dart';
+import '/src/widgets/location_indicator_wrapper.dart';
 import '/src/widgets/orientation_indicator_wrapper.dart';
 import '/src/widgets/accuracy_indicator.dart';
 import '/src/widgets/location_indicator.dart';
@@ -73,6 +76,10 @@ class AnimatedLocationLayer extends StatefulWidget {
 
   final Curve accuracyAnimationCurve;
 
+  /// Fires on real and interpolated orientation, location and accuracy value changes.
+
+  final AnimatedLocationController? controller;
+
   const AnimatedLocationLayer({
     this.locationUpdateInterval = const Duration(milliseconds: 1000),
     this.orientationUpdateInterval = const Duration(milliseconds: 200),
@@ -88,6 +95,8 @@ class AnimatedLocationLayer extends StatefulWidget {
     this.locationAnimationCurve = Curves.linear,
     this.orientationAnimationCurve = Curves.ease,
     this.accuracyAnimationCurve = Curves.ease,
+    this.cameraTrackingMode = CameraTrackingMode.none,
+    this.controller,
     super.key,
   });
 
@@ -101,85 +110,80 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
   static const _earthCircumference = _piDoubled * earthRadius;
 
+  // TODO: Move interpolation and state entirely into the controller.
+  // So the animation/interpolation is not done by the widgets and instead by the controller.
+  // The widgets then simply consume these values.
+
   LatLng? _location;
 
   double _accuracy = 0;
 
   double? _orientation;
 
-  late FlutterMapState _map;
+  AnimatedLocationController? _internalController;
+  AnimatedLocationControllerImpl get _controller => (
+      widget.controller
+      ?? (_internalController ??= AnimatedLocationController())
+    ) as AnimatedLocationControllerImpl;
+
+
+  late MapCamera _mapCamera;
 
   StreamSubscription<Position>? _locationStreamSub;
   StreamSubscription<SensorEvent>? _orientationStreamSub;
 
-  late final AnimationController _positionAnimationController;
-
-  late final CurvedAnimation _positionAnimation;
-
-  // animate over lat long because pixels are affected by zoom due to projection
-  LatLngTween? _positionTween;
+  late final StreamSubscription<ServiceStatus> _serviceStatusStreamSub;
 
   @override
   void initState() {
     super.initState();
+    _setupSensorStreams();
 
-    _positionAnimationController = AnimationController(
-      vsync: this,
-      duration: widget.locationAnimationDuration,
-    );
+    _serviceStatusStreamSub = Geolocator.getServiceStatusStream().listen((event) {
+      _cleanupSensorStreams();
+      _setupSensorStreams();
+    });
 
-    _positionAnimation = CurvedAnimation(
-      parent: _positionAnimationController,
-      curve: widget.locationAnimationCurve,
-    );
 
-    _setupStreams();
   }
-
 
   @override
   void didUpdateWidget(covariant AnimatedLocationLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _cleanupSensorStreams();
+    _setupSensorStreams();
 
-    _positionAnimationController.duration = widget.locationAnimationDuration;
-    _positionAnimation.curve = widget.locationAnimationCurve;
-
-    _cleanupStreams();
-    _setupStreams();
   }
-
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
-    _map = FlutterMapState.maybeOf(context)!;
+    _mapCamera = MapCamera.of(context);
   }
-
 
   @override
   Widget build(BuildContext context) {
-    if (_positionTween == null || !_isVisible) {
-      return const SizedBox.shrink();
-    }
+    if (!_isVisible) return const SizedBox.shrink();
 
-    return Flow(
-      delegate: _FlowPositionDelegate(
-        position: _positionTween!.animate(_positionAnimation),
-        mapState: _map,
-      ),
+    return LocationIndicatorWrapper(
+      position: _location!,
+      duration: widget.locationAnimationDuration,
+      curve: widget.locationAnimationCurve,
+      controller: _controller,
       children: [
         if (_accuracy > 0) AccuracyIndicatorWrapper(
           radius: _accuracy,
           scale: _scale,
           duration: widget.accuracyAnimationDuration,
           curve: widget.accuracyAnimationCurve,
+          controller: _controller,
           child: widget.accuracyIndicator,
         ),
         if (_orientation != null) OrientationIndicatorWrapper(
           orientation: _orientation!,
           duration: widget.orientationAnimationDuration,
           curve: widget.orientationAnimationCurve,
+          controller: _controller,
           child: widget.orientationIndicator,
         ),
         widget.locationIndicator,
@@ -188,7 +192,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
-  void _setupStreams() async {
+  void _setupSensorStreams() async {
     final locationServiceEnabled = await Geolocator.isLocationServiceEnabled();
     if (locationServiceEnabled) {
       final permission = await Geolocator.checkPermission();
@@ -212,71 +216,47 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
-  void _cleanupStreams() {
+  void _cleanupSensorStreams() {
     _locationStreamSub?.cancel();
     _orientationStreamSub?.cancel();
     _locationStreamSub = null;
     _orientationStreamSub = null;
   }
 
-
-  void _updatePositionTween(LatLng location) {
-    // set first position without animating
-    if (_positionTween == null) {
-      _positionTween = LatLngTween(begin: location, end: location);
-    }
-    // animate between new and previous position
-    else {
-      _positionTween!
-      ..begin = _positionTween!.evaluate(_positionAnimation)
-      ..end = location;
-    }
-  }
-
-
   double get _scale => _location != null
-    ? _calculateMetersPerPixel(_location!.latitude, _map.zoom) : 1;
+    ? _calculateMetersPerPixel(_location!.latitude, _mapCamera.zoom) : 1;
 
 
   bool get _isVisible {
-    if (_location == null || _positionTween == null) {
-      return false;
-    }
-
+    final location = _controller.location ?? _location;
+    if (location == null) return false;
     final accuracyInPixel = _accuracy / _scale;
-
     final biggestSize = max(accuracyInPixel, 100);
-    final positionInPixel = _map.project(_positionTween!.evaluate(_positionAnimation));
+    final positionInPixel = _mapCamera.project(location);
     final sw = CustomPoint(positionInPixel.x + biggestSize, positionInPixel.y - biggestSize);
     final ne = CustomPoint(positionInPixel.x - biggestSize, positionInPixel.y + biggestSize);
 
-    return _map.pixelBounds.containsPartialBounds(Bounds(sw, ne));
+    return _mapCamera.pixelBounds.containsPartialBounds(Bounds(sw, ne));
   }
 
 
   void _handlePositionEvent(Position event) {
-    _location = LatLng(event.latitude, event.longitude);
-    _updatePositionTween(_location!);
+    setState(() {
+      _location = LatLng(event.latitude, event.longitude);
+    });
 
-    // don't update animation or rebuild widget when indicator is not visible in order to prevent repaints
-    if (_isVisible) {
-      _positionAnimationController
-      ..value = 0.0
-      ..forward();
-
-      final newAccuracy = event.accuracy;
-      // check if difference threshold is reached
-      if ((_accuracy - newAccuracy).abs() > widget.accuracyDifferenceThreshold) {
-        setState(() {
-          _accuracy = newAccuracy;
-        });
-      }
+    final newAccuracy = event.accuracy;
+    // check if difference threshold is reached
+    if ((_accuracy - newAccuracy).abs() > widget.accuracyDifferenceThreshold) {
+      setState(() {
+        _accuracy = newAccuracy;
+      });
     }
   }
 
 
   void _handleAbsoluteOrientationEvent(SensorEvent event) {
-    double? newOrientation = 0;
+    final double newOrientation;
 
     // don't rebuild widget when indicator is not visible in order to prevent repaints
     if (_isVisible) {
@@ -299,6 +279,9 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
         // convert from [-pi, pi] to [0,2pi]
         newOrientation = (_piDoubled - azimuth) % _piDoubled;
       }
+      else {
+        newOrientation = 0;
+      }
 
       // check if difference threshold is reached
       if (_orientation == null ||
@@ -312,6 +295,8 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   }
 
 
+
+
   double _calculateMetersPerPixel(double latitude, double zoomLevel) {
     final latitudeRadians = latitude * (pi/180);
     return _earthCircumference * cos(latitudeRadians) / pow(2, zoomLevel + 8);
@@ -320,64 +305,9 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
   @override
   void dispose() {
-    _positionAnimationController.dispose();
-    _positionAnimation.dispose();
-    _cleanupStreams();
+    _cleanupSensorStreams();
+    _serviceStatusStreamSub.cancel();
+    _internalController?.dispose();
     super.dispose();
-  }
-}
-
-
-/// Flow-Delegate to position the indicators.
-
-class _FlowPositionDelegate extends FlowDelegate {
-
-  final Animation<LatLng> position;
-
-  final FlutterMapState mapState;
-
-  _FlowPositionDelegate({
-    required this.position,
-    required this.mapState,
-  }) : super(repaint: position);
-
-
-  @override
-  bool shouldRepaint(_FlowPositionDelegate oldDelegate) {
-    return position != oldDelegate.position ||
-           mapState != oldDelegate.mapState;
-  }
-
-  @override
-  void paintChildren(FlowPaintingContext context) {
-    final absPixelPosition = mapState.project(position.value);
-    final relPixelPosition = absPixelPosition - mapState.pixelOrigin;
-
-    for (var i = 0; i < context.childCount; i++) {
-      final halfChildSize = context.getChildSize(i)! / 2;
-      final sw = CustomPoint(absPixelPosition.x + halfChildSize.width, absPixelPosition.y - halfChildSize.height);
-      final ne = CustomPoint(absPixelPosition.x - halfChildSize.width, absPixelPosition.y + halfChildSize.height);
-      // only render visible widgets
-      if (mapState.pixelBounds.containsPartialBounds(Bounds(sw, ne))) {
-        context.paintChild(i,
-          transform: Matrix4.translationValues(
-            // center all widgets
-            relPixelPosition.x - halfChildSize.width,
-            relPixelPosition.y - halfChildSize.height,
-            0,
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  BoxConstraints getConstraintsForChild(int i, BoxConstraints constraints) {
-    // set constraints to infinity in order to allow the children (like the accuracy circle)
-    // to size themselves bigger than the constraints passed from the outside (usually the screen size)
-    return const BoxConstraints(
-      maxHeight: double.infinity,
-      maxWidth: double.infinity,
-    );
   }
 }
