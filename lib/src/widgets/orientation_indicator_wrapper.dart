@@ -1,6 +1,9 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
+
+import '/src/animated_location_controller.dart';
+import '/src/animation/rotation_tween.dart';
+
+typedef OrientationAnimationUpdate = void Function(BuildContext context, double angle);
 
 
 /// The rotation/orientation will implicitly animate whenever it changes.
@@ -14,8 +17,11 @@ class OrientationIndicatorWrapper extends ImplicitlyAnimatedWidget {
 
   final Widget child;
 
+  final AnimatedLocationControllerImpl controller;
+
   const OrientationIndicatorWrapper({
     required this.child,
+    required this.controller,
     this.orientation = 0,
     super.duration = const Duration(milliseconds: 300),
     super.curve = Curves.ease,
@@ -30,6 +36,8 @@ class OrientationIndicatorWrapper extends ImplicitlyAnimatedWidget {
 class _OrientationIndicatorWrapperState extends AnimatedWidgetBaseState<OrientationIndicatorWrapper> {
   RotationTween? _rotationTween;
 
+  double get _orientation => _rotationTween?.evaluate(animation) ?? _rotationTween?.begin ?? 0;
+
   @override
   void forEachTween(TweenVisitor<dynamic> visitor) {
     _rotationTween = visitor(
@@ -43,9 +51,22 @@ class _OrientationIndicatorWrapperState extends AnimatedWidgetBaseState<Orientat
   Widget build(context) {
     return Transform.rotate(
       alignment: Alignment.center,
-      angle: _rotationTween?.evaluate(animation) ?? _rotationTween?.begin ?? 0,
+      angle: _orientation,
       child: widget.child
     );
   }
 
+  @override
+  void initState() {
+    super.initState();
+    animation.addListener(_handleAnimation);
+  }
+
+  @override
+  void dispose() {
+    animation.removeListener(_handleAnimation);
+    super.dispose();
+  }
+
+  void _handleAnimation() => widget.controller.orientation = _orientation;
 }

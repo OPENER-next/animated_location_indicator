@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '/src/animated_location_controller.dart';
+
 
 /// The radius will implicitly animate whenever it changes.
 
@@ -12,11 +14,14 @@ class AccuracyIndicatorWrapper extends ImplicitlyAnimatedWidget {
 
   final double radius;
 
+  final AnimatedLocationControllerImpl controller;
+
   final Widget child;
 
   const AccuracyIndicatorWrapper({
     required this.radius,
     required this.child,
+    required this.controller,
     this.scale = 1,
     super.duration = const Duration(milliseconds: 300),
     super.curve = Curves.ease,
@@ -31,6 +36,8 @@ class AccuracyIndicatorWrapper extends ImplicitlyAnimatedWidget {
 class _AccuracyIndicatorWrapperState extends AnimatedWidgetBaseState<AccuracyIndicatorWrapper> {
   Tween<double>? _sizeTween;
 
+  double get _accuracy => _sizeTween?.evaluate(animation) ?? _sizeTween?.begin ?? 0;
+
   @override
   void forEachTween(TweenVisitor<dynamic> visitor) {
     _sizeTween = visitor(
@@ -43,10 +50,22 @@ class _AccuracyIndicatorWrapperState extends AnimatedWidgetBaseState<AccuracyInd
   @override
   Widget build(context) {
     return SizedBox.fromSize(
-      size: Size.fromRadius(
-        (_sizeTween?.evaluate(animation) ?? _sizeTween?.begin ?? 0) / widget.scale,
-      ),
+      size: Size.fromRadius(_accuracy / widget.scale),
       child: widget.child,
     );
   }
+
+  @override
+  void initState() {
+    super.initState();
+    animation.addListener(_handleAnimation);
+  }
+
+  @override
+  void dispose() {
+    animation.removeListener(_handleAnimation);
+    super.dispose();
+  }
+
+  void _handleAnimation() => widget.controller.accuracy = _accuracy;
 }
