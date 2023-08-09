@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/plugin_api.dart';
 import 'package:latlong2/latlong.dart';
@@ -101,12 +103,12 @@ class _FlowPositionDelegate extends FlowDelegate {
   @override
   void paintChildren(FlowPaintingContext context) {
     final absPixelPosition = mapCamera.project(position.value);
-    final relPixelPosition = absPixelPosition - mapCamera.pixelOrigin;
+    final relPixelPosition = absPixelPosition - mapCamera.pixelOrigin.toDoublePoint();
 
     for (var i = 0; i < context.childCount; i++) {
       final halfChildSize = context.getChildSize(i)! / 2;
-      final sw = CustomPoint(absPixelPosition.x + halfChildSize.width, absPixelPosition.y - halfChildSize.height);
-      final ne = CustomPoint(absPixelPosition.x - halfChildSize.width, absPixelPosition.y + halfChildSize.height);
+      final sw = Point(absPixelPosition.x + halfChildSize.width, absPixelPosition.y - halfChildSize.height);
+      final ne = Point(absPixelPosition.x - halfChildSize.width, absPixelPosition.y + halfChildSize.height);
       // only render visible widgets
       if (mapCamera.pixelBounds.containsPartialBounds(Bounds(sw, ne))) {
         context.paintChild(i,

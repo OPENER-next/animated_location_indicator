@@ -31,7 +31,9 @@ class _MyAppState extends State<MyApp> {
         body: FlutterMap(
           mapController: _mapController,
           options: MapOptions(
-            enableMultiFingerGestureRace: true,
+            interactionOptions: const InteractionOptions(
+              enableMultiFingerGestureRace: true,
+            ),
             onMapReady: () async {
               final position = await acquireUserLocation();
               if (position != null) {
@@ -44,11 +46,12 @@ class _MyAppState extends State<MyApp> {
           ),
           children: [
             TileLayer(
-              overrideTilesWhenUrlChanges: true,
               urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
               tileProvider: NetworkTileProvider(),
             ),
-            const AnimatedLocationLayer(),
+            const AnimatedLocationLayer(
+              // cameraTrackingMode: CameraTrackingMode.locationAndOrientation,
+            ),
           ],
         )
       )
