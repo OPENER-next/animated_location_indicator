@@ -322,14 +322,14 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
           _controller.location!,
           _mapCamera.zoom,
           _controller.orientation! * (-180/pi),
-          id: "AnimatedLocationLayerCameraTracking",
+          id: 'AnimatedLocationLayerCameraTracking',
         );
       }
       else {
         controller.move(
           _controller.location!,
           _mapCamera.zoom,
-          id: "AnimatedLocationLayerCameraTracking",
+          id: 'AnimatedLocationLayerCameraTracking',
         );
       }
     }
