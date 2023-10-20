@@ -175,29 +175,31 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   Widget build(BuildContext context) {
     if (!_isVisible) return const SizedBox.shrink();
 
-    return LocationIndicatorWrapper(
-      position: _location!,
-      duration: widget.locationAnimationDuration,
-      curve: widget.locationAnimationCurve,
-      controller: _controller,
-      children: [
-        if (_accuracy > 0) AccuracyIndicatorWrapper(
-          radius: _accuracy,
-          scale: _scale,
-          duration: widget.accuracyAnimationDuration,
-          curve: widget.accuracyAnimationCurve,
-          controller: _controller,
-          child: widget.accuracyIndicator,
-        ),
-        if (_orientation != null) OrientationIndicatorWrapper(
-          orientation: _orientation!,
-          duration: widget.orientationAnimationDuration,
-          curve: widget.orientationAnimationCurve,
-          controller: _controller,
-          child: widget.orientationIndicator,
-        ),
-        widget.locationIndicator,
-      ],
+    return MobileLayerTransformer(
+      child: LocationIndicatorWrapper(
+        position: _location!,
+        duration: widget.locationAnimationDuration,
+        curve: widget.locationAnimationCurve,
+        controller: _controller,
+        children: [
+          if (_accuracy > 0) AccuracyIndicatorWrapper(
+            radius: _accuracy,
+            scale: _scale,
+            duration: widget.accuracyAnimationDuration,
+            curve: widget.accuracyAnimationCurve,
+            controller: _controller,
+            child: widget.accuracyIndicator,
+          ),
+          if (_orientation != null) OrientationIndicatorWrapper(
+            orientation: _orientation!,
+            duration: widget.orientationAnimationDuration,
+            curve: widget.orientationAnimationCurve,
+            controller: _controller,
+            child: widget.orientationIndicator,
+          ),
+          widget.locationIndicator,
+        ],
+      ),
     );
   }
 
