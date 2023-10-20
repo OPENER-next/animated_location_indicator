@@ -28,8 +28,8 @@ class OrientationIndicatorWrapper extends ImplicitlyAnimatedWidget {
     super.key,
   });
 
-   @override
-  _OrientationIndicatorWrapperState createState() => _OrientationIndicatorWrapperState();
+  @override
+  AnimatedWidgetBaseState<OrientationIndicatorWrapper> createState() => _OrientationIndicatorWrapperState();
 }
 
 

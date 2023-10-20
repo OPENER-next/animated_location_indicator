@@ -28,8 +28,8 @@ class AccuracyIndicatorWrapper extends ImplicitlyAnimatedWidget {
     super.key,
   });
 
-   @override
-  _AccuracyIndicatorWrapperState createState() => _AccuracyIndicatorWrapperState();
+  @override
+  AnimatedWidgetBaseState<AccuracyIndicatorWrapper> createState() => _AccuracyIndicatorWrapperState();
 }
 
 

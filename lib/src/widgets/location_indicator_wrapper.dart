@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/plugin_api.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '/src/animated_location_controller.dart';
@@ -33,8 +33,8 @@ class LocationIndicatorWrapper extends ImplicitlyAnimatedWidget {
     super.key,
   });
 
-   @override
-  _LocationIndicatorWrapperState createState() => _LocationIndicatorWrapperState();
+  @override
+  AnimatedWidgetBaseState<LocationIndicatorWrapper> createState() => _LocationIndicatorWrapperState();
 }
 
 

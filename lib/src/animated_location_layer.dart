@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter_map/plugin_api.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_sensors/flutter_sensors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -140,7 +140,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     ) as AnimatedLocationControllerImpl;
 
 
-  late MapCamera _mapCamera;
+  MapCamera get _mapCamera => MapCamera.of(context);
 
   StreamSubscription<Position>? _locationStreamSub;
   StreamSubscription<SensorEvent>? _orientationStreamSub;
@@ -169,12 +169,6 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     if (widget.controller != oldWidget.controller) {
       (oldWidget.controller ?? _internalController)?.removeListener(_updateCamera);
     }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _mapCamera = MapCamera.of(context);
   }
 
   @override
@@ -249,8 +243,8 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
     final accuracyInPixel = _accuracy / _scale;
     final biggestSize = max(accuracyInPixel, 100);
     final positionInPixel = _mapCamera.project(location);
-    final sw = CustomPoint(positionInPixel.x + biggestSize, positionInPixel.y - biggestSize);
-    final ne = CustomPoint(positionInPixel.x - biggestSize, positionInPixel.y + biggestSize);
+    final sw = Point(positionInPixel.x + biggestSize, positionInPixel.y - biggestSize);
+    final ne = Point(positionInPixel.x - biggestSize, positionInPixel.y + biggestSize);
 
     return _mapCamera.pixelBounds.containsPartialBounds(Bounds(sw, ne));
   }
