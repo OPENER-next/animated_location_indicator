@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map/flutter_map.dart' hide LatLngTween;
 import 'package:latlong2/latlong.dart';
 
 import '/src/animated_location_controller.dart';
