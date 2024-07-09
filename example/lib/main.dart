@@ -19,6 +19,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final _mapController = MapController();
+  final _animationLocationController = AnimatedLocationController();
 
   @override
   Widget build(BuildContext context) {
@@ -37,10 +38,9 @@ class _MyAppState extends State<MyApp> {
             onMapReady: () async {
               final position = await acquireUserLocation();
               if (position != null) {
-                // IMPORTANT: rebuild location layer when permissions are granted
-                setState(() {
-                  _mapController.move(LatLng(position.latitude, position.longitude), 16);
-                });
+                // IMPORTANT: activate when permissions are granted
+                _animationLocationController.activate();
+                _mapController.move(LatLng(position.latitude, position.longitude), 16);
               }
             },
           ),
@@ -49,7 +49,8 @@ class _MyAppState extends State<MyApp> {
               urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
               tileProvider: NetworkTileProvider(),
             ),
-            const AnimatedLocationLayer(
+            AnimatedLocationLayer(
+              controller: _animationLocationController,
               // cameraTrackingMode: CameraTrackingMode.locationAndOrientation,
             ),
           ],
