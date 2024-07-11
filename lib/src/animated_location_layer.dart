@@ -118,7 +118,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
 
   @override
   Widget build(BuildContext context) {
-    if (!_controller.isActive && !_isVisible) return const SizedBox.shrink();
+    if (!_controller.isActive || !_isVisible) return const SizedBox.shrink();
 
     return MobileLayerTransformer(
       child: LocationIndicatorWrapper(
