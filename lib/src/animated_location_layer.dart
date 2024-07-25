@@ -120,6 +120,12 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       _controller.addListener(_updateCamera);
       _controller.addRawListener(_updateIndicator);
     }
+    if (widget.cameraTrackingMode != oldWidget.cameraTrackingMode &&
+        widget.cameraTrackingMode != CameraTrackingMode.none
+    ) {
+      // immediately enforce camera tracking without waiting for a new position change
+      _updateCamera();
+    }
   }
 
   @override
