@@ -247,14 +247,22 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
     if (locationServiceEnabled) {
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
-        _locationStreamSub = Geolocator.getPositionStream(
-          locationSettings: AndroidSettings(
-            intervalDuration: locationUpdateInterval,
-            distanceFilter: locationDifferenceThreshold,
-          )
-        ).listen(_handlePositionEvent, onError: (_) => deactivate());
+        _locationStreamSub = _getPositionStream()
+          .listen(_handlePositionEvent, onError: (_) => deactivate());
       }
     }
+  }
+
+  // required to chain streams together
+  Stream<Position> _getPositionStream() async* {
+    // used to forcefully get an initial position and not wait for an upcoming position event
+    yield await Geolocator.getLastKnownPosition() ?? await Geolocator.getCurrentPosition();
+    yield* Geolocator.getPositionStream(
+      locationSettings: AndroidSettings(
+        intervalDuration: locationUpdateInterval,
+        distanceFilter: locationDifferenceThreshold,
+      ),
+    );
   }
 
   void _cleanupLocationStream() {
