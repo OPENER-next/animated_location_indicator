@@ -112,7 +112,13 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
   void didUpdateWidget(covariant AnimatedLocationLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.controller != oldWidget.controller) {
-      (oldWidget.controller ?? _internalController)?.removeListener(_updateCamera);
+      final oldController = oldWidget.controller ?? _internalController;
+      if (oldController != null) {
+        oldController.removeListener(_updateCamera);
+        oldController.removeRawListener(_updateIndicator);
+      }
+      _controller.addListener(_updateCamera);
+      _controller.addRawListener(_updateIndicator);
     }
   }
 
@@ -191,7 +197,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       );
     }
     else if (widget.cameraTrackingMode == CameraTrackingMode.location &&
-              _controller.location != null
+             _controller.location != null
     ) {
       controller.move(
         _controller.location!,
@@ -200,7 +206,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Sing
       );
     }
     else if (widget.cameraTrackingMode == CameraTrackingMode.orientation &&
-              _controller.orientation != null
+             _controller.orientation != null
     ) {
       // (counter) rotate map so the map faces always the direction the user is facing
       controller.rotate(
