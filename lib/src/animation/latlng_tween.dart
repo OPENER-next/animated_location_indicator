@@ -3,16 +3,18 @@ import 'package:latlong2/latlong.dart';
 
 /// Interpolate latitude and longitude values.
 
-class LatLngTween extends Tween<LatLng> {
+class LatLngTween extends Tween<LatLng?> {
   static const piDoubled = pi * 2;
 
   LatLngTween({ LatLng? begin, LatLng? end }) : super(begin: begin, end: end);
 
   @override
-  LatLng lerp(double t) {
+  LatLng? lerp(double t) {
+    if (end == null || begin == null) {
+      return begin ?? end;
+    }
     // latitude varies from [90, -90]
     // longitude varies from [180, -180]
-
     final latitudeDelta = end!.latitude - begin!.latitude;
     final latitude = begin!.latitude + latitudeDelta * t;
 

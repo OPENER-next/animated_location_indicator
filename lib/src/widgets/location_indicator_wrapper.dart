@@ -4,87 +4,42 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' hide LatLngTween;
 import 'package:latlong2/latlong.dart';
 
-import '/src/animated_location_controller.dart';
-import '/src/animation/latlng_tween.dart';
-
-
-typedef LocationAnimationUpdate = void Function(BuildContext context, LatLng position);
-
-
 /// The rotation/orientation will implicitly animate whenever it changes.
 
-class LocationIndicatorWrapper extends ImplicitlyAnimatedWidget {
+class LocationIndicatorWrapper extends StatelessWidget {
   /// The value is expected to be in radians.
 
-  final LatLng position;
+  final Animation<LatLng?> position;
 
-  /// An custom widget that will replace the default indicator.
+  /// Any widgets that should be stacked on top of each other in the center.
 
   final List<Widget> children;
-
-  final AnimatedLocationControllerImpl controller;
 
   const LocationIndicatorWrapper({
     required this.children,
     required this.position,
-    required this.controller,
-    super.duration = const Duration(milliseconds: 300),
-    super.curve = Curves.ease,
     super.key,
   });
 
   @override
-  AnimatedWidgetBaseState<LocationIndicatorWrapper> createState() => _LocationIndicatorWrapperState();
-}
-
-
-class _LocationIndicatorWrapperState extends AnimatedWidgetBaseState<LocationIndicatorWrapper> {
-  // animate over lat long because pixels are affected by zoom due to projection
-  LatLngTween? _positionTween;
-
-  LatLng get _position => _positionTween?.evaluate(animation) ?? _positionTween!.begin!;
-
-  @override
-  void forEachTween(TweenVisitor<dynamic> visitor) {
-    _positionTween = visitor(
-      _positionTween,
-      widget.position,
-      (value) => LatLngTween(begin: value)
-    ) as LatLngTween;
-  }
-
-  @override
   Widget build(context) {
-    return Flow(
-      delegate: _FlowPositionDelegate(
-        position: _positionTween!.animate(animation),
-        mapCamera: MapCamera.of(context),
+    return MobileLayerTransformer(
+      child: Flow(
+        delegate: _FlowPositionDelegate(
+          position: position,
+          mapCamera: MapCamera.of(context),
+        ),
+        children: children,
       ),
-      children: widget.children,
     );
   }
-
-  @override
-  void initState() {
-    super.initState();
-    animation.addListener(_handleAnimation);
-  }
-
-  @override
-  void dispose() {
-    animation.removeListener(_handleAnimation);
-    super.dispose();
-  }
-
-  void _handleAnimation() => widget.controller.location = _position;
 }
-
 
 /// Flow-Delegate to position the indicators.
 
 class _FlowPositionDelegate extends FlowDelegate {
 
-  final Animation<LatLng> position;
+  final Animation<LatLng?> position;
 
   final MapCamera mapCamera;
 
@@ -102,7 +57,9 @@ class _FlowPositionDelegate extends FlowDelegate {
 
   @override
   void paintChildren(FlowPaintingContext context) {
-    final absPixelPosition = mapCamera.project(position.value);
+    if (position.value == null) return;
+
+    final absPixelPosition = mapCamera.project(position.value!);
     final relPixelPosition = absPixelPosition - mapCamera.pixelOrigin.toDoublePoint();
 
     for (var i = 0; i < context.childCount; i++) {

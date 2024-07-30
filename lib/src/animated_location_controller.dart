@@ -1,88 +1,74 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/animation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_sensors/flutter_sensors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'animation/interpolator.dart';
+import 'animation/latlng_tween.dart';
+import 'animation/rotation_tween.dart';
+
+
 /// Can be used to retrieve the underlying values (real and interpolated) that drive the indicators.
 ///
 /// Notifies whenever `location`, `accuracy`, `orientation` or `isActive` changes.
 ///
-/// The uninterpolated values can be accessed via `rawOrientation`, `rawAccuracy`, `rawOrientation` and listened to via `addRawListener()`.
+/// The animated values can be accessed via `animatedOrientation`, `animatedAccuracy`, `animatedOrientation`.
+///
+/// **Note:** vsync should be a multi ticker provider like `TickerProviderStateMixin`.
 
-abstract class AnimatedLocationController implements ChangeNotifier {
-  // Factory constructor redirects to underlying implementation's constructor.
-  factory AnimatedLocationController() = AnimatedLocationControllerImpl._;
+class AnimatedLocationController extends ChangeNotifier {
 
-  /// Location may be null if the location permissions aren't granted or the location service is turned of.
-
-  LatLng? get location;
-
-  double get accuracy;
-
-  /// Orientation may be null if the device doesn't provide the respective sensors.
-
-  double? get orientation;
-
-
-  /// Location may be null if the location permissions aren't granted or the location service is turned of.
-
-  LatLng? get rawLocation;
-
-  double get rawAccuracy;
-
-  /// Orientation may be null if the device doesn't provide the respective sensors.
-
-  double? get rawOrientation;
-
-
-  /// The time interval in which new location data should be fetched.
-  Duration get locationUpdateInterval;
-
-  /// The time interval in which new sensor data should be fetched.
-  Duration get orientationUpdateInterval;
-
-  /// The minimal distance difference in meters of the new and the previous position that will be detected as a change.
-  int get locationDifferenceThreshold;
-
-  /// The minimal difference in radians of the new and the previous orientation that will be detected as a change.
-  double get orientationDifferenceThreshold;
-
-
-  /// The minimal difference in meters of the new and the previous accuracy that will be detected as a change.
-  double get accuracyDifferenceThreshold;
-
-
-  bool get isActive;
-
-  void activate();
-
-  void deactivate();
-
-  /// Calls listener every time the raw location or orientation changes.
-  void addRawListener(VoidCallback listener);
-
-  /// Stops calling the listener every time the raw location or orientation changes.
-  void removeRawListener(VoidCallback listener);
-}
-
-/// Used to hide internal setters and functions.
-
-class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedLocationController {
   StreamSubscription<Position>? _locationStreamSub;
   StreamSubscription<SensorEvent>? _orientationStreamSub;
 
   late final StreamSubscription<ServiceStatus> _serviceStatusStreamSub;
 
-  AnimatedLocationControllerImpl._({
+  final Interpolator<LatLng?> _animatedLocation;
+  final Interpolator<double> _animatedAccuracy;
+  final Interpolator<double> _animatedOrientation;
+
+  AnimatedLocationController({
+    required TickerProvider vsync,
     Duration locationUpdateInterval = const Duration(milliseconds: 1000),
     Duration orientationUpdateInterval = const Duration(milliseconds: 200),
     int locationDifferenceThreshold = 1,
     double orientationDifferenceThreshold = 0.1,
     double accuracyDifferenceThreshold = 0.5,
+    /// The duration of the location change transition.
+    Duration locationAnimationDuration = const Duration(milliseconds: 1500),
+    /// The duration of the accuracy change transition.
+    Duration accuracyAnimationDuration = const Duration(milliseconds: 600),
+    /// The duration of the orientation change transition.
+    Duration orientationAnimationDuration = const Duration(milliseconds: 600),
+    /// The curve used for the location change transition.
+    Curve locationAnimationCurve = Curves.linear,
+    /// The curve used for the orientation change transition.
+    Curve orientationAnimationCurve = Curves.ease,
+    /// The curve used for the accuracy change transition.
+    Curve accuracyAnimationCurve = Curves.ease
   }) :
+    _animatedLocation = Interpolator(
+      vsync: vsync,
+      tween: LatLngTween(),
+      duration: locationAnimationDuration,
+      curve: locationAnimationCurve,
+    ),
+    _animatedAccuracy = Interpolator(
+      vsync: vsync,
+      tween: Tween<double>(begin: 0, end: 0),
+      duration: accuracyAnimationDuration,
+      curve: accuracyAnimationCurve,
+    ),
+    _animatedOrientation = Interpolator(
+      vsync: vsync,
+      tween: RotationTween(begin: 0, end: 0),
+      duration: orientationAnimationDuration,
+      curve: orientationAnimationCurve,
+    ),
     _locationUpdateInterval = locationUpdateInterval,
     _orientationUpdateInterval = orientationUpdateInterval,
     _locationDifferenceThreshold = locationDifferenceThreshold,
@@ -101,10 +87,8 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
     });
   }
 
-  @override
   bool get isActive => _locationStreamSub != null;
 
-  @override
   void activate() {
     if (isActive) deactivate();
     _setupLocationStream();
@@ -112,7 +96,6 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
     notifyListeners();
   }
 
-  @override
   void deactivate() {
     _cleanupLocationStream();
     _cleanupRotationSensorStream();
@@ -120,7 +103,7 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
   }
 
   Duration _locationUpdateInterval;
-  @override
+  /// The time interval in which new location data should be fetched.
   Duration get locationUpdateInterval => _locationUpdateInterval;
   set locationUpdateInterval(Duration value) {
     if (value != _locationUpdateInterval) {
@@ -131,7 +114,7 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
   }
 
   Duration _orientationUpdateInterval;
-  @override
+  /// The time interval in which new sensor data should be fetched.
   Duration get orientationUpdateInterval => _orientationUpdateInterval;
   set orientationUpdateInterval(Duration value) {
     if (value != _orientationUpdateInterval) {
@@ -142,7 +125,7 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
   }
 
   int _locationDifferenceThreshold;
-  @override
+  /// The minimal distance difference in meters of the new and the previous position that will be detected as a change.
   int get locationDifferenceThreshold => _locationDifferenceThreshold;
   set locationDifferenceThreshold(int value) {
     if (value != _locationDifferenceThreshold) {
@@ -153,7 +136,7 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
   }
 
   double _orientationDifferenceThreshold;
-  @override
+  /// The minimal difference in radians of the new and the previous orientation that will be detected as a change.
   double get orientationDifferenceThreshold => _orientationDifferenceThreshold;
   set orientationDifferenceThreshold(double value) {
     if (value != _orientationDifferenceThreshold) {
@@ -164,7 +147,7 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
   }
 
   double _accuracyDifferenceThreshold;
-  @override
+  /// The minimal difference in meters of the new and the previous accuracy that will be detected as a change.
   double get accuracyDifferenceThreshold => _accuracyDifferenceThreshold;
   set accuracyDifferenceThreshold(double value) {
     if (value != _accuracyDifferenceThreshold) {
@@ -174,71 +157,20 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
     }
   }
 
-  // animated/interpolated location and sensors value
-
-  LatLng? _location;
-  @override
-  LatLng? get location => _location;
-  set location(LatLng? value) {
-    if (value != _location) {
-      _location = value;
-      notifyListeners();
-    }
-  }
-
-  double _accuracy = 0;
-  @override
-  double get accuracy => _accuracy;
-  set accuracy(double value) {
-    if (value != _accuracy) {
-      _accuracy = value;
-      notifyListeners();
-    }
-  }
-
-  double? _orientation;
-  @override
-  double? get orientation => _orientation;
-  set orientation(double? value) {
-    if (value != _orientation) {
-      _orientation = value;
-      notifyListeners();
-    }
-  }
-
-  // raw location and sensor values
+  Animation<LatLng?> get animatedLocation => _animatedLocation;
+  Animation<double> get animatedAccuracy => _animatedAccuracy;
+  Animation<double> get animatedOrientation => _animatedOrientation;
 
   LatLng? _rawLocation;
-  @override
-  LatLng? get rawLocation => _rawLocation;
+  /// Location may be null if the location permissions aren't granted or the location service is turned of.
+  LatLng? get location => _rawLocation;
 
   double _rawAccuracy = 0;
-  @override
-  double get rawAccuracy => _rawAccuracy;
+  double get accuracy => _rawAccuracy;
 
   double? _rawOrientation;
-  @override
-  double? get rawOrientation => _rawOrientation;
-
-  // raw listener methods
-
-  final _rawListeners = ObserverList<VoidCallback>();
-
-  @override
-  void addRawListener(VoidCallback listener) {
-    _rawListeners.add(listener);
-  }
-
-  @override
-  void removeRawListener(VoidCallback listener) {
-    _rawListeners.remove(listener);
-  }
-
-  void _notifyRawListeners() {
-    for (final listener in _rawListeners) {
-      listener();
-    }
-  }
+  /// Orientation may be null if the device doesn't provide the respective sensors.
+  double? get orientation => _rawOrientation;
 
   // location methods
 
@@ -272,13 +204,15 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
 
   void _handlePositionEvent(Position event) {
     _rawLocation = LatLng(event.latitude, event.longitude);
+    _animatedLocation.value = _rawLocation!;
 
     final newAccuracy = event.accuracy;
     // check if difference threshold is reached
     if ((_rawAccuracy - newAccuracy).abs() > accuracyDifferenceThreshold) {
       _rawAccuracy = newAccuracy;
+      _animatedAccuracy.value = newAccuracy;
     }
-    _notifyRawListeners();
+    notifyListeners();
   }
 
   // rotation sensor methods
@@ -329,14 +263,17 @@ class AnimatedLocationControllerImpl extends ChangeNotifier implements AnimatedL
       (_rawOrientation! - newOrientation).abs() > orientationDifferenceThreshold
     ) {
       _rawOrientation = newOrientation;
-      _notifyRawListeners();
+      _animatedOrientation.value = newOrientation;
+      notifyListeners();
     }
   }
 
   @override
   void dispose() {
     _serviceStatusStreamSub.cancel();
-    _rawListeners.clear();
+    _animatedLocation.dispose();
+    _animatedAccuracy.dispose();
+    _animatedOrientation.dispose();
     deactivate();
     super.dispose();
   }

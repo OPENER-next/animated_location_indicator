@@ -17,9 +17,9 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with TickerProviderStateMixin {
   final _mapController = MapController();
-  final _animationLocationController = AnimatedLocationController();
+  late final _animationLocationController = AnimatedLocationController(vsync: this);
 
   @override
   Widget build(BuildContext context) {
