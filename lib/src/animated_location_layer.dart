@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -65,7 +66,10 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Tick
       widget.controller
       ?? (_internalController ??= AnimatedLocationController(vsync: this));
 
-  MapCamera get _mapCamera => MapCamera.of(context);
+  // use map controller instead of MapCamera.of(context) to get the most recent camera object
+  // otherwise the camera might be changed by the controller but not populated yet
+  // since the controller rarely changes this also avoids rebuilding the widget on every camera change
+  MapController get _mapController => MapController.of(context);
 
   @override
   void initState() {
@@ -102,14 +106,26 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Tick
     return LocationIndicatorWrapper(
       position: _controller.animatedLocation,
       children: [
-        ValueListenableBuilder<double>(
-          valueListenable: _controller.animatedAccuracy,
-          builder: (context, value, child) => _controller.accuracy > 0
-            ? SizedBox.square(
-              dimension: value / _scale,
-              child: child,
-            )
-            : const SizedBox.shrink(),
+        ListenableBuilder(
+          listenable: Listenable.merge([
+            _controller.animatedAccuracy,
+            // required because the visual size depends on the location (_calculateMetersPerPixel)
+            _controller.animatedLocation,
+          ]),
+          builder: (context, child) {
+            if (_controller.accuracy > 0 && _controller.animatedLocation.value != null) {
+              final scale = _calculateMetersPerPixel(
+                _controller.animatedLocation.value!.latitude,
+                // important to cause rebuilds whenever the zoom changes
+                MapCamera.of(context).zoom,
+              );
+              return SizedBox.square(
+                dimension: _controller.animatedAccuracy.value / scale,
+                child: child,
+              );
+            }
+            return const SizedBox.shrink();
+          },
           child: widget.accuracyIndicator,
         ),
         ValueListenableBuilder<double>(
@@ -127,26 +143,22 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Tick
     );
   }
 
-
-  double get _scale => _controller.animatedLocation.value != null
-    ? _calculateMetersPerPixel(_controller.animatedLocation.value!.latitude, _mapCamera.zoom) : 1;
-
   /// Handles camera position and rotation updates when the AnimatedLocationController changes.
   ///
   /// Should only be called via a ticker/animation so it is not fired while rendering a frame.
 
   void _updateCamera() async {
     if (!mounted) return;
-    final controller = MapController.of(context);
+    final mapController = _mapController;
 
     if (widget.cameraTrackingMode == CameraTrackingMode.locationAndOrientation &&
         _controller.animatedLocation.value != null &&
         _controller.orientation != null
     ) {
       // (counter) rotate map so the map faces always the direction the user is facing
-      controller.moveAndRotate(
+      mapController.moveAndRotate(
         _controller.animatedLocation.value!,
-        _mapCamera.zoom,
+        mapController.camera.zoom,
         _controller.animatedOrientation.value * (-180/pi),
         id: 'AnimatedLocationLayerCameraTracking',
       );
@@ -154,9 +166,9 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Tick
     else if (widget.cameraTrackingMode == CameraTrackingMode.location &&
              _controller.animatedLocation.value != null
     ) {
-      controller.move(
+      mapController.move(
         _controller.animatedLocation.value!,
-        _mapCamera.zoom,
+        mapController.camera.zoom,
         id: 'AnimatedLocationLayerCameraTracking',
       );
     }
@@ -164,7 +176,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Tick
              _controller.orientation != null
     ) {
       // (counter) rotate map so the map faces always the direction the user is facing
-      controller.rotate(
+      mapController.rotate(
         _controller.animatedOrientation.value * (-180/pi),
         id: 'AnimatedLocationLayerCameraTracking',
       );
@@ -178,7 +190,6 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Tick
     final latitudeRadians = latitude * (pi/180);
     return earthCircumference * cos(latitudeRadians) / pow(2, zoomLevel + 8);
   }
-
 
   @override
   void dispose() {
