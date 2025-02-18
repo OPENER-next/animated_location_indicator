@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:math';
 
+import 'package:compassx/compassx.dart';
 import 'package:flutter/animation.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_sensors/flutter_sensors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -23,7 +22,7 @@ import 'animation/rotation_tween.dart';
 class AnimatedLocationController extends ChangeNotifier {
 
   StreamSubscription<Position>? _locationStreamSub;
-  StreamSubscription<SensorEvent>? _orientationStreamSub;
+  StreamSubscription<CompassXEvent>? _orientationStreamSub;
 
   late final StreamSubscription<ServiceStatus> _serviceStatusStreamSub;
 
@@ -34,7 +33,6 @@ class AnimatedLocationController extends ChangeNotifier {
   AnimatedLocationController({
     required TickerProvider vsync,
     Duration locationUpdateInterval = const Duration(milliseconds: 1000),
-    Duration orientationUpdateInterval = const Duration(milliseconds: 200),
     int locationDifferenceThreshold = 1,
     double orientationDifferenceThreshold = 0.1,
     double accuracyDifferenceThreshold = 0.5,
@@ -70,7 +68,6 @@ class AnimatedLocationController extends ChangeNotifier {
       curve: orientationAnimationCurve,
     ),
     _locationUpdateInterval = locationUpdateInterval,
-    _orientationUpdateInterval = orientationUpdateInterval,
     _locationDifferenceThreshold = locationDifferenceThreshold,
     _orientationDifferenceThreshold = orientationDifferenceThreshold,
     _accuracyDifferenceThreshold = accuracyDifferenceThreshold
@@ -110,17 +107,6 @@ class AnimatedLocationController extends ChangeNotifier {
       _locationUpdateInterval = value;
       _cleanupLocationStream();
       _setupLocationStream();
-    }
-  }
-
-  Duration _orientationUpdateInterval;
-  /// The time interval in which new sensor data should be fetched.
-  Duration get orientationUpdateInterval => _orientationUpdateInterval;
-  set orientationUpdateInterval(Duration value) {
-    if (value != _orientationUpdateInterval) {
-      _orientationUpdateInterval = value;
-      _cleanupRotationSensorStream();
-      _setupRotationSensorStream();
     }
   }
 
@@ -218,13 +204,10 @@ class AnimatedLocationController extends ChangeNotifier {
   // rotation sensor methods
 
   void _setupRotationSensorStream() async {
-    if (await SensorManager().isSensorAvailable(Sensors.ROTATION)) {
-      final stream = await SensorManager().sensorUpdates(
-        sensorId: Sensors.ROTATION,
-        interval: orientationUpdateInterval,
-      );
-      _orientationStreamSub = stream.listen(_handleAbsoluteOrientationEvent);
-    }
+    _orientationStreamSub = CompassX.events.listen(
+      _handleAbsoluteOrientationEvent,
+      cancelOnError: true,
+    );
   }
 
   void _cleanupRotationSensorStream() {
@@ -232,32 +215,9 @@ class AnimatedLocationController extends ChangeNotifier {
     _orientationStreamSub = null;
   }
 
-  void _handleAbsoluteOrientationEvent(SensorEvent event) {
-    const piDoubled = 2 * pi;
-    final double newOrientation;
-    if (defaultTargetPlatform == TargetPlatform.iOS) {
-      // ios provides azimuth in degrees
-      newOrientation = degToRadian(event.data.first);
-    }
-    else if (defaultTargetPlatform == TargetPlatform.android) {
-      final g = event.data;
-      final norm = sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2] + g[3] * g[3]);
-      // normalize and set values to commonly known quaternion letter representatives
-      final x = g[0] / norm;
-      final y = g[1] / norm;
-      final z = g[2] / norm;
-      final w = g[3] / norm;
-      // calc azimuth in radians
-      final sinA = 2.0 * (w * z + x * y);
-      final cosA = 1.0 - 2.0 * (y * y + z * z);
-      final azimuth = atan2(sinA, cosA);
-      // convert from [-pi, pi] to [0,2pi]
-      newOrientation = (piDoubled - azimuth) % piDoubled;
-    }
-    else {
-      newOrientation = 0;
-    }
-
+  void _handleAbsoluteOrientationEvent(CompassXEvent event) {
+    const radPerDegree = pi/180;
+    final newOrientation = event.heading * radPerDegree;
     // check if difference threshold is reached
     if (_rawOrientation == null ||
       (_rawOrientation! - newOrientation).abs() > orientationDifferenceThreshold
