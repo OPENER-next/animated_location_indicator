@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' hide LatLngTween;
 import 'package:latlong2/latlong.dart';
@@ -59,20 +57,22 @@ class _FlowPositionDelegate extends FlowDelegate {
   void paintChildren(FlowPaintingContext context) {
     if (position.value == null) return;
 
-    final absPixelPosition = mapCamera.project(position.value!);
-    final relPixelPosition = absPixelPosition - mapCamera.pixelOrigin.toDoublePoint();
-
+    final absPixelPosition = mapCamera.projectAtZoom(position.value!);
+    final relPixelPosition = absPixelPosition - mapCamera.pixelOrigin;
     for (var i = 0; i < context.childCount; i++) {
-      final halfChildSize = context.getChildSize(i)! / 2;
-      final sw = Point(absPixelPosition.x + halfChildSize.width, absPixelPosition.y - halfChildSize.height);
-      final ne = Point(absPixelPosition.x - halfChildSize.width, absPixelPosition.y + halfChildSize.height);
+      final childSize = context.getChildSize(i)!;
+      final bounds = Rect.fromCenter(
+        center: absPixelPosition,
+        width: childSize.width,
+        height: childSize.height,
+      );
       // only render visible widgets
-      if (mapCamera.pixelBounds.containsPartialBounds(Bounds(sw, ne))) {
+      if (mapCamera.pixelBounds.overlaps(bounds)) {
         context.paintChild(i,
           transform: Matrix4.translationValues(
             // center all widgets
-            relPixelPosition.x - halfChildSize.width,
-            relPixelPosition.y - halfChildSize.height,
+            relPixelPosition.dx - childSize.width/2,
+            relPixelPosition.dy - childSize.height/2,
             0,
           ),
         );

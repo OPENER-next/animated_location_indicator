@@ -23,6 +23,8 @@ if (flutterVersionName == null) {
 }
 
 android {
+    namespace "com.example.example"
+
     compileSdkVersion 34
 
     compileOptions {
