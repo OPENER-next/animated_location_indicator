@@ -16,7 +16,7 @@ dependencies:
 
   geolocator: ^13.0.1
   latlong2: ^0.9.0
-  flutter_map: ^7.0.2
+  flutter_map: ^8.1.1
   animated_location_indicator:
     path: ../
 
