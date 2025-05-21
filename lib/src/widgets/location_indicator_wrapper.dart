@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' hide LatLngTween;
 import 'package:latlong2/latlong.dart';
 
-/// The rotation/orientation will implicitly animate whenever it changes.
-
 class LocationIndicatorWrapper extends StatelessWidget {
-  /// The value is expected to be in radians.
+  /// The current location.
 
   final Animation<LatLng?> position;
 

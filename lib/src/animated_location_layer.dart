@@ -74,8 +74,7 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Tick
   @override
   void initState() {
     super.initState();
-    _controller.animatedLocation.addListener(_updateCamera);
-    _controller.animatedOrientation.addListener(_updateCamera);
+    _register(_controller);
   }
 
   @override
@@ -84,11 +83,9 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Tick
     if (widget.controller != oldWidget.controller) {
       final oldController = oldWidget.controller ?? _internalController;
       if (oldController != null) {
-        _controller.animatedLocation.removeListener(_updateCamera);
-        _controller.animatedOrientation.removeListener(_updateCamera);
+        _unregister(oldController);
       }
-      _controller.animatedLocation.addListener(_updateCamera);
-      _controller.animatedOrientation.addListener(_updateCamera);
+      _register(_controller);
     }
     if (widget.cameraTrackingMode != oldWidget.cameraTrackingMode &&
         widget.cameraTrackingMode != CameraTrackingMode.none
@@ -191,10 +188,19 @@ class _AnimatedLocationLayerState extends State<AnimatedLocationLayer> with Tick
     return earthCircumference * cos(latitudeRadians) / pow(2, zoomLevel + 8);
   }
 
+  void _register(AnimatedLocationController controller) {
+    controller.animatedLocation.addListener(_updateCamera);
+    controller.animatedOrientation.addListener(_updateCamera);
+  }
+
+  void _unregister(AnimatedLocationController controller) {
+    controller.animatedLocation.removeListener(_updateCamera);
+    controller.animatedOrientation.removeListener(_updateCamera);
+  }
+
   @override
   void dispose() {
-    _controller.animatedLocation.removeListener(_updateCamera);
-    _controller.animatedOrientation.removeListener(_updateCamera);
+    _unregister(_controller);
     _internalController?.dispose();
     super.dispose();
   }

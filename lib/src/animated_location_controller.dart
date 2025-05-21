@@ -84,19 +84,30 @@ class AnimatedLocationController extends ChangeNotifier {
     });
   }
 
-  bool get isActive => _locationStreamSub != null;
+  bool _isActive = false;
+  bool get isActive => _isActive;
 
   void activate() {
-    if (isActive) deactivate();
-    _setupLocationStream();
-    _setupRotationSensorStream();
+    if (isActive) _deactivate();
+    _activate();
     notifyListeners();
   }
 
+  void _activate() {
+    _isActive = true;
+    _setupLocationStream();
+    _setupRotationSensorStream();
+  }
+
   void deactivate() {
+    _deactivate();
+    notifyListeners();
+  }
+
+  void _deactivate() {
     _cleanupLocationStream();
     _cleanupRotationSensorStream();
-    notifyListeners();
+    _isActive = false;
   }
 
   Duration _locationUpdateInterval;
@@ -105,8 +116,10 @@ class AnimatedLocationController extends ChangeNotifier {
   set locationUpdateInterval(Duration value) {
     if (value != _locationUpdateInterval) {
       _locationUpdateInterval = value;
-      _cleanupLocationStream();
-      _setupLocationStream();
+      if (isActive) {
+        _cleanupLocationStream();
+        _setupLocationStream();
+      }
     }
   }
 
@@ -116,8 +129,10 @@ class AnimatedLocationController extends ChangeNotifier {
   set locationDifferenceThreshold(int value) {
     if (value != _locationDifferenceThreshold) {
       _locationDifferenceThreshold = value;
-      _cleanupLocationStream();
-      _setupLocationStream();
+      if (isActive) {
+        _cleanupLocationStream();
+        _setupLocationStream();
+      }
     }
   }
 
@@ -127,8 +142,6 @@ class AnimatedLocationController extends ChangeNotifier {
   set orientationDifferenceThreshold(double value) {
     if (value != _orientationDifferenceThreshold) {
       _orientationDifferenceThreshold = value;
-      _cleanupRotationSensorStream();
-      _setupRotationSensorStream();
     }
   }
 
@@ -138,8 +151,6 @@ class AnimatedLocationController extends ChangeNotifier {
   set accuracyDifferenceThreshold(double value) {
     if (value != _accuracyDifferenceThreshold) {
       _accuracyDifferenceThreshold = value;
-      _cleanupLocationStream();
-      _setupLocationStream();
     }
   }
 
@@ -165,8 +176,12 @@ class AnimatedLocationController extends ChangeNotifier {
     if (locationServiceEnabled) {
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
-        _locationStreamSub = _getPositionStream()
-          .listen(_handlePositionEvent, onError: (_) => deactivate());
+        // the controller might have been deactivated by now
+        if (isActive) {
+          // only listen to stream if there isn't already a subscription
+          _locationStreamSub ??= _getPositionStream()
+            .listen(_handlePositionEvent, onError: (_) => deactivate());
+        }
       }
     }
   }
@@ -203,8 +218,9 @@ class AnimatedLocationController extends ChangeNotifier {
 
   // rotation sensor methods
 
-  void _setupRotationSensorStream() async {
-    _orientationStreamSub = CompassX.events.listen(
+  void _setupRotationSensorStream() {
+    // only listen to stream if there isn't already a subscription
+    _orientationStreamSub ??= CompassX.events.listen(
       _handleAbsoluteOrientationEvent,
       cancelOnError: true,
     );
@@ -230,11 +246,11 @@ class AnimatedLocationController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _deactivate();
     _serviceStatusStreamSub.cancel();
     _animatedLocation.dispose();
     _animatedAccuracy.dispose();
     _animatedOrientation.dispose();
-    deactivate();
     super.dispose();
   }
 }
